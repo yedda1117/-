@@ -1,0 +1,104 @@
+# 云端植物 / 小生态箱照护系统：后端 ↔ 硬件端接口文档
+
+## 1. 通信协议概述
+* [cite_start]**协议**: MQTT v3.1.1 [cite: 14]
+* [cite_start]**数据格式**: JSON [cite: 14]
+* [cite_start]**Topic 规范**: `device/{deviceId}/{module}/{action}` [cite: 14]
+* **QoS 级别**: 1 (确保指令到达)
+
+## 2. 硬件模块接口定义
+
+### 2.1 环境监测与核心调节模块 (E53_IA1)
+[cite_start]**作用**: 采集温湿度、光照数据，并控制风扇与补光灯。 [cite: 17, 20]
+
+* **上报数据 (设备 → 后端)**
+    * [cite_start]**Topic**: `device/{id}/ia1/telemetry` 
+    * **Payload**:
+        ```json
+        {
+          "temperature": 24.5,
+          "humidity": 65,
+          "light_intensity": 850,
+          "fan_status": "OFF",
+          "light_status": "ON",
+          "timestamp": 1713123456
+        }
+        ```
+* **远程控制 (后端 → 设备)**
+    * **Topic**: `device/{id}/ia1/control` [cite: 14, 22]
+    * **Payload**:
+        ```json
+        {
+          "target": "fan", // 或 "light"
+          "action": "ON"   // 或 "OFF"
+        }
+        ```
+
+### 2.2 陪伴互动模块 (E53_IS1)
+[cite_start]**作用**: 通过人体红外感应检测主人是否靠近，增加互动感。 [cite: 17, 26]
+
+* **事件上报 (设备 → 后端)**
+    * [cite_start]**Topic**: `device/{id}/is1/event` 
+    * **Payload**:
+        ```json
+        {
+          "event_type": "human_approach",
+          "status": 1, // 1: 检测到靠近, 0: 离开
+          "timestamp": 1713123456
+        }
+        ```
+
+### 2.3 倾斜检测模块 (E53_SC2)
+[cite_start]**作用**: 监测植物或花盆是否被移动、碰倒或歪放。 [cite: 17, 24]
+
+* **异常上报 (设备 → 后端)**
+    * [cite_start]**Topic**: `device/{id}/sc2/alert` [cite: 24]
+    * **Payload**:
+        ```json
+        {
+          "alert_type": "tilt_detected",
+          "is_tilt": true,
+          "timestamp": 1713123456
+        }
+        ```
+
+### 2.4 烟雾 / 气体检测模块 (E53_SF1)
+[cite_start]**作用**: 监测生态箱周围空气是否异常，触发安全预警。 [cite: 17, 24]
+
+* **告警上报 (设备 → 后端)**
+    * [cite_start]**Topic**: `device/{id}/sf1/alert` 
+    * **Payload**:
+        ```json
+        {
+          "alert_type": "smoke_gas_emergency",
+          "value": 120, // 浓度数值
+          "level": "CRITICAL", // NORMAL, WARNING, CRITICAL
+          "timestamp": 1713123456
+        }
+        ```
+
+### 2.5 高亮 LED 补光模块 (E53_SC1)
+[cite_start]**作用**: 作为额外的状态提示灯或夜间高亮补光。 [cite: 17, 22]
+
+* **远程控制 (后端 → 设备)**
+    * [cite_start]**Topic**: `device/{id}/sc1/control` 
+    * **Payload**:
+        ```json
+        {
+          "action": "ON", // 或 "OFF"
+          "mode": "manual" // manual: 手动, auto: 策略触发
+        }
+        ```
+
+## 3. 核心业务流向说明
+
+| 业务场景 | 触发条件 | 涉及模块 | [cite_start]后端逻辑处理 [cite: 14, 22] |
+| :--- | :--- | :--- | :--- |
+| **自动调节** | 光照不足或环境闷热 | E53_IA1 | [cite_start]判断数据超限，自动下发 `control` 指令开启补光或风扇 [cite: 22] |
+| **异常提醒** | 植物被碰歪或空气异常 | E53_SC2 / E53_SF1 | [cite_start]接收 `alert` 消息，向前端推送告警并记录日志 [cite: 24] |
+| **陪伴互动** | 感应到人靠近 | E53_IS1 | [cite_start]记录陪伴次数，更新前端植物为“开心”状态 [cite: 26] |
+
+## 4. 设备状态监控
+* [cite_start]**在线/离线**: 后端通过 MQTT 的遗嘱消息（Will Message）监控设备状态。 [cite: 14]
+* **Topic**: `device/{id}/status`
+* **Payload**: `online` 或 `offline`
