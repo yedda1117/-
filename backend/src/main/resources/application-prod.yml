@@ -22,7 +22,7 @@ app:
     client-id: ${MQTT_CLIENT_ID:plantcloud-backend}
     username: ${MQTT_USERNAME:}
     password: ${MQTT_PASSWORD:}
-    subscribe-topic: ${MQTT_SUBSCRIBE_TOPIC:device/+/sc2/alert}
+    subscribe-topic: ${MQTT_SUBSCRIBE_TOPIC:device/+/+/+}
     qos: ${MQTT_QOS:1}
     automatic-reconnect: ${MQTT_AUTOMATIC_RECONNECT:true}
   minio:

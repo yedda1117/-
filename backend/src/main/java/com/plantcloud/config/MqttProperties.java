@@ -30,7 +30,7 @@ public class MqttProperties {
     /**
      * Topic subscribed on startup.
      */
-    private String subscribeTopic = "device/+/sc2/alert";
+    private String subscribeTopic = "device/+/+/+";
 
     /**
      * Quality of service for subscription.

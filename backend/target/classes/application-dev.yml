@@ -27,7 +27,7 @@ app:
     client-id: plantcloud-backend
     username:
     password:
-    subscribe-topic: device/+/sc2/alert
+    subscribe-topic: device/+/+/+
     qos: 1
     automatic-reconnect: true
   minio:

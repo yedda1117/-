@@ -1,6 +1,6 @@
 {
   "initialized": true,
-  "lastUpdate": 1776129872286,
+  "lastUpdate": 1776134958694,
   "version": "1.0.0",
   "scriptCount": 10,
   "templateCount": 5,
@@ -10,7 +10,7 @@
     "missingFiles": []
   },
   "metadata": {
-    "initializedAt": 1776072380259,
+    "initializedAt": 1776134958694,
     "platform": "win32",
     "extensionVersion": "1.0.0"
   }
