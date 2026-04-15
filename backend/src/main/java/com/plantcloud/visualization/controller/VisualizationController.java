@@ -23,11 +23,12 @@ public class VisualizationController {
     private final VisualizationService visualizationService;
 
     @GetMapping("/history")
-    public Result<EnvironmentHistoryVO> getHistory(@RequestParam Long plantId,
-                                                   @RequestParam(required = false) String metric,
-                                                   @RequestParam(required = false) String startTime,
-                                                   @RequestParam(required = false) String endTime) {
-        return Result.ok(visualizationService.getHistory(plantId, metric, startTime, endTime));
+    public Result<EnvironmentHistoryVO> getHistory(@RequestParam("start_time") String startTime,
+                                                   @RequestParam("end_time") String endTime,
+                                                   @RequestParam(required = false, defaultValue = "hour") String granularity,
+                                                   @RequestParam(required = false) String metrics,
+                                                   @RequestParam(value = "plant_type", required = false) String plantType) {
+        return Result.ok(visualizationService.getHistory(startTime, endTime, granularity, metrics, plantType));
     }
 
     @GetMapping("/calendar")

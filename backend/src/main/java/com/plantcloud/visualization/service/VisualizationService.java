@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface VisualizationService {
 
-    EnvironmentHistoryVO getHistory(Long plantId, String metric, String startTime, String endTime);
+    EnvironmentHistoryVO getHistory(String startTime, String endTime, String granularity, String metrics, String plantType);
 
     List<CalendarDayVO> getCalendar(Long plantId, String month);
 

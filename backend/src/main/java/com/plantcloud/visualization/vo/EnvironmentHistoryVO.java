@@ -10,6 +10,11 @@ import java.util.List;
 public class EnvironmentHistoryVO {
 
     private Long plantId;
+    private String plantType;
+    private String startTime;
+    private String endTime;
+    private String granularity;
+    private List<String> metrics;
     private List<HistoryPointVO> temperature;
     private List<HistoryPointVO> humidity;
     private List<HistoryPointVO> light;
@@ -18,6 +23,6 @@ public class EnvironmentHistoryVO {
     @Builder
     public static class HistoryPointVO {
         private String time;
-        private String value;
+        private Double value;
     }
 }

@@ -29,6 +29,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/system/db/ping",
+                                "/visualization/history",
+                                "/companion/events",
                                 "/photos/**",
                                 "/uploads/**"
                         ).permitAll()
