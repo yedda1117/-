@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { NavHeader } from "@/components/nav-header"
 import { PixelPlant, PlantState } from "@/components/pixel-plant"
+import { GPSStatus } from "@/components/gps-status"
+import { DeviceControl } from "@/components/device-control"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -21,8 +22,6 @@ import {
   Sun,
   User,
   AlertTriangle,
-  Fan,
-  Lightbulb,
   Activity,
   Leaf,
 } from "lucide-react"
@@ -121,7 +120,7 @@ const plantProfiles: PlantProfile[] = [
 
 export default function HomePage() {
   const [lightOn, setLightOn] = useState(true)
-  const [fanOn, setFanOn] = useState(false)
+  const [fanOn, setFanOn] = useState(true)
   const [plantState, setPlantState] = useState<PlantState>("healthy")
   const [selectedPlantId, setSelectedPlantId] = useState("p1")
 
@@ -189,9 +188,9 @@ export default function HomePage() {
       <main className="container mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* 左侧栏：植物动态日志 */}
-          <div className="lg:col-span-3">
-            <Card className="h-full">
+          {/* 左侧栏：植物动态日志 + GPS 定位 */}
+          <div className="lg:col-span-3 space-y-6">
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Activity className="h-4 w-4 text-primary" />
@@ -225,6 +224,9 @@ export default function HomePage() {
                 </ScrollArea>
               </CardContent>
             </Card>
+
+            {/* GPS 定位状态组件 */}
+            <GPSStatus />
           </div>
 
           {/* 中间区域：植物主体 */}
@@ -250,30 +252,12 @@ export default function HomePage() {
                 {/* 控制面板 */}
                 <div className="flex items-center justify-between w-full max-w-xl bg-muted/30 rounded-2xl p-4 border">
                   {/* 补光灯控制 */}
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`p-2 rounded-xl ${lightOn ? "bg-amber-100" : "bg-gray-100"}`}>
-                      <Lightbulb className={`h-5 w-5 ${lightOn ? "text-amber-600" : "text-gray-400"}`} />
-                    </div>
-                    <div className="flex-1 min-w-[80px]">
-                      <p className="font-medium text-sm">补光灯</p>
-                      <p className="text-xs text-muted-foreground">{lightOn ? "开启中" : "已关闭"}</p>
-                    </div>
-                    <Switch checked={lightOn} onCheckedChange={setLightOn} />
-                  </div>
+                  <DeviceControl type="light" isOn={lightOn} onToggle={setLightOn} />
 
                   <div className="w-px h-8 bg-border mx-2" />
 
                   {/* 风扇控制 */}
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`p-2 rounded-xl ${fanOn ? "bg-blue-100" : "bg-gray-100"}`}>
-                      <Fan className={`h-5 w-5 ${fanOn ? "text-blue-600 animate-spin" : "text-gray-400"}`} style={{ animationDuration: "1s" }} />
-                    </div>
-                    <div className="flex-1 min-w-[80px]">
-                      <p className="font-medium text-sm">风扇</p>
-                      <p className="text-xs text-muted-foreground">{fanOn ? "运转中" : "已关闭"}</p>
-                    </div>
-                    <Switch checked={fanOn} onCheckedChange={setFanOn} />
-                  </div>
+                  <DeviceControl type="fan" isOn={fanOn} onToggle={setFanOn} />
 
                   <div className="w-px h-8 bg-border mx-2" />
 

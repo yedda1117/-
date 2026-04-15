@@ -167,7 +167,9 @@ function RuleDialog({
   const [condType, setCondType] = useState("light")
   const [condOp, setCondOp] = useState("lt")
   const [condVal, setCondVal] = useState("")
-  const [condTime, setCondTime] = useState("")
+  const [enableTimeRange, setEnableTimeRange] = useState(false)
+  const [startTime, setStartTime] = useState("18:00")
+  const [endTime, setEndTime] = useState("22:00")
   const [actionType, setActionType] = useState("light")
 
   const buildCondition = () => {
@@ -175,7 +177,9 @@ function RuleDialog({
     const metric = condType === "light" ? "光照强度" : condType === "temp" ? "温度" : "湿度"
     const unit = condType === "light" ? " lux" : condType === "temp" ? "°C" : "%"
     let cond = `${metric} ${opLabel} ${condVal}${unit}`
-    if (condTime) cond += ` 且 时间在 ${condTime}`
+    if (enableTimeRange && startTime && endTime) {
+      cond += ` 且 时间在 ${startTime}–${endTime}`
+    }
     return cond
   }
   const buildAction = () => {
@@ -216,10 +220,47 @@ function RuleDialog({
             </Select>
             <Input placeholder="数值" value={condVal} onChange={(e) => setCondVal(e.target.value)} />
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">时间范围（可选，如 18:00-22:00）</label>
-            <Input className="mt-1" placeholder="18:00-22:00" value={condTime} onChange={(e) => setCondTime(e.target.value)} />
+          
+          {/* 时间范围设置 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">限制时间范围</span>
+              </div>
+              <Switch checked={enableTimeRange} onCheckedChange={setEnableTimeRange} />
+            </div>
+            
+            {enableTimeRange && (
+              <div className="space-y-3 p-4 rounded-xl border bg-background">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">起始时间</label>
+                    <Input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">结束时间</label>
+                    <Input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>策略仅在 {startTime} 至 {endTime} 期间生效</span>
+                </div>
+              </div>
+            )}
           </div>
+
           <Separator />
           <p className="text-sm font-medium">则（执行动作）</p>
           <Select value={actionType} onValueChange={setActionType}>
