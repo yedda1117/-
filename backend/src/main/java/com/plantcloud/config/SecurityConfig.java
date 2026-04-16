@@ -28,12 +28,12 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/devices/**",
                                 "/system/db/ping",
                                 "/visualization/history",
                                 "/companion/events",
                                 "/photos/**",
-                                "/uploads/**",
-                                "/strategies/**"
+                                "/uploads/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
