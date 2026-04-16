@@ -36,3 +36,6 @@ replay_pid*.log
 *.argfile
 cp.txt
 compile.log
+
+# local tooling
+.zhanlu/

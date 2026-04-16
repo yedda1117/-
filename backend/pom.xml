@@ -98,11 +98,6 @@
             <version>${smartjavaai.version}</version>
         </dependency>
         <dependency>
-            <groupId>cn.smartjavaai</groupId>
-            <artifactId>face</artifactId>
-            <version>${smartjavaai.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
