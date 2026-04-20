@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // 这里的基准地址可以根据开发环境切换
-const BACKEND_BASE_URL = "https://virtserver.swaggerhub.com/x1808843327organizat/cloudPlant/1.0.0"
+const BACKEND_BASE_URL = "http://localhost:8080"
 
 export async function GET(req: NextRequest) {
   try {
