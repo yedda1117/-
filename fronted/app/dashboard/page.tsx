@@ -3,7 +3,6 @@
 import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AuthGuard } from "@/components/auth-guard"
-import { NavHeader } from "@/components/nav-header"
 import DashMain from "./DashMain"
 import DashDetail from "./DashDetail"
 
@@ -35,7 +34,6 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavHeader />
       <main className="container mx-auto px-6 py-6">
         <div className="mb-5">
           <h1 className="text-xl font-semibold text-foreground">植物监测总览</h1>

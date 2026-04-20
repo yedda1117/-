@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react"
 import { AuthGuard } from "@/components/auth-guard"
-import { NavHeader } from "@/components/nav-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -469,7 +468,6 @@ export default function ChatPage() {
   return (
     <AuthGuard>
     <div className="min-h-screen bg-gradient-to-br from-green-100/80 via-emerald-50/50 to-teal-50/60">
-      <NavHeader />
 
       <main className="container mx-auto px-4 py-2">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-100px)]">

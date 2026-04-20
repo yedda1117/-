@@ -7,7 +7,6 @@ import {
   Bot,
   CheckCircle,
   Droplets,
-  Leaf,
   ShieldAlert,
   Sparkles,
   Sun,
@@ -339,42 +338,25 @@ export default function DashDetail({ plant, onBack }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="fixed left-1/2 top-4 z-40 -translate-x-1/2">
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="flex items-center gap-3 rounded-full border border-border/70 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md"
+      {/* 左上角浮动返回按钮 */}
+      <div className="fixed left-5 top-20 z-40">
+        <motion.button
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          onClick={onBack}
+          className="flex items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-2 shadow-md backdrop-blur-md transition-colors hover:bg-muted"
         >
-          <button
-            onClick={onBack}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 text-foreground" />
-          </button>
-          <span className="pr-1 text-sm font-medium text-foreground">
-            {plant.emoji} {plant.name} · 环境分析看板
-          </span>
-        </motion.div>
+          <ArrowLeft className="h-4 w-4 text-foreground" />
+          <span className="text-sm font-medium text-foreground">返回总览</span>
+        </motion.button>
       </div>
 
-      <main className="container mx-auto flex flex-col gap-4 px-6 pb-6 pt-16">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-foreground">数据库环境数据已接入</p>
-            <p className="text-xs text-muted-foreground">
-              {loading ? "正在加载环境分析..." : `最近更新：${lastUpdatedText}`}
-            </p>
-            {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Leaf className="h-4 w-4 text-primary" />
-            <span>植物 ID：{plant.plantId}</span>
-          </div>
-        </div>
+      <main className="container mx-auto flex flex-col gap-4 px-6 pb-6 pt-4">
+        {error ? <p className="rounded-xl bg-destructive/5 px-4 py-2 text-xs text-destructive">{error}</p> : null}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
+          <Card className="bg-gradient-to-br from-pink-50 to-card">
             <CardContent className="p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -397,7 +379,7 @@ export default function DashDetail({ plant, onBack }: Props) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-sky-50 to-card">
             <CardContent className="p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
