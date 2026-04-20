@@ -1,9 +1,7 @@
 package com.plantcloud.device.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.plantcloud.common.enums.ResultCode;
 import com.plantcloud.device.dto.DeviceBindPlantRequest;
-import com.plantcloud.device.entity.Device;
 import com.plantcloud.device.mapper.DeviceMapper;
 import com.plantcloud.device.service.DeviceBindingService;
 import com.plantcloud.device.vo.DeviceBindResponseVO;
@@ -19,40 +17,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeviceBindingServiceImpl implements DeviceBindingService {
 
     private static final String ACTIVE_PLANT_STATUS = "ACTIVE";
+    private static final Long BOUND_DEVICE_SET_ID = 1L;
+    private static final String BOUND_DEVICE_SET_CODE = "1,2,3,4,5,6,7";
 
     private final DeviceMapper deviceMapper;
     private final PlantMapper plantMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DeviceBindResponseVO bindPlant(Long deviceId, DeviceBindPlantRequest request) {
-        Device device = requireDevice(deviceId);
+    public DeviceBindResponseVO bindPlant(DeviceBindPlantRequest request) {
         Plant plant = requireActivePlant(request.getPlantId());
-
-        device.setPlantId(plant.getId());
-        deviceMapper.updateById(device);
-
-        return buildResponse(device, plant);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public DeviceBindResponseVO unbindPlant(Long deviceId) {
-        Device device = requireDevice(deviceId);
-
-        deviceMapper.update(null, new LambdaUpdateWrapper<Device>()
-                .eq(Device::getId, deviceId)
-                .set(Device::getPlantId, null));
-
-        return buildResponse(device, null);
-    }
-
-    private Device requireDevice(Long deviceId) {
-        Device device = deviceMapper.selectById(deviceId);
-        if (device == null) {
-            throw new BizException(ResultCode.NOT_FOUND.getCode(), "Device not found");
-        }
-        return device;
+        deviceMapper.bindPlantToDeviceSet(plant.getId());
+        return buildResponse(plant);
     }
 
     private Plant requireActivePlant(Long plantId) {
@@ -66,12 +42,12 @@ public class DeviceBindingServiceImpl implements DeviceBindingService {
         return plant;
     }
 
-    private DeviceBindResponseVO buildResponse(Device device, Plant plant) {
+    private DeviceBindResponseVO buildResponse(Plant plant) {
         return DeviceBindResponseVO.builder()
-                .deviceId(device.getId())
-                .deviceCode(device.getDeviceCode())
-                .plantId(plant != null ? plant.getId() : null)
-                .plantName(plant != null ? plant.getPlantName() : null)
+                .deviceId(BOUND_DEVICE_SET_ID)
+                .deviceCode(BOUND_DEVICE_SET_CODE)
+                .plantId(plant.getId())
+                .plantName(plant.getPlantName())
                 .build();
     }
 }
