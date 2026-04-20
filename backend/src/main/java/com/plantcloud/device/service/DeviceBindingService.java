@@ -5,7 +5,5 @@ import com.plantcloud.device.vo.DeviceBindResponseVO;
 
 public interface DeviceBindingService {
 
-    DeviceBindResponseVO bindPlant(Long deviceId, DeviceBindPlantRequest request);
-
-    DeviceBindResponseVO unbindPlant(Long deviceId);
+    DeviceBindResponseVO bindPlant(DeviceBindPlantRequest request);
 }
