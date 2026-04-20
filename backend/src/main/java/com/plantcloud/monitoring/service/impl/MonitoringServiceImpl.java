@@ -175,7 +175,7 @@ public class MonitoringServiceImpl implements MonitoringService {
 
             String payload = buildTriggerPayload(strategy, currentValue, collectedAt);
             StrategyExecutionLog latestLog = strategyExecutionLogMapper.selectLatestByStrategyId(strategy.getId());
-            if (latestLog != null && payload.equals(latestLog.getTriggerPayload())) {
+            if (isDuplicateTrigger(latestLog, currentValue, payload)) {
                 continue;
             }
 
@@ -190,6 +190,17 @@ public class MonitoringServiceImpl implements MonitoringService {
             log.setExecutedAt(LocalDateTime.now());
             strategyExecutionLogMapper.insert(log);
         }
+    }
+
+    private boolean isDuplicateTrigger(StrategyExecutionLog latestLog, BigDecimal currentValue, String payload) {
+        if (latestLog == null) {
+            return false;
+        }
+        if (latestLog.getTriggerMetricValue() != null
+                && latestLog.getTriggerMetricValue().compareTo(currentValue) == 0) {
+            return true;
+        }
+        return payload.equals(latestLog.getTriggerPayload());
     }
 
     private BigDecimal resolveMetricValue(String metricType,

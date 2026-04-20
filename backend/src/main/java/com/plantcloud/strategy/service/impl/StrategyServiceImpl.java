@@ -154,7 +154,7 @@ public class StrategyServiceImpl implements StrategyService {
 
         String payload = buildTriggerPayload(strategy, currentValue);
         StrategyExecutionLog latestLog = strategyExecutionLogMapper.selectLatestByStrategyId(strategy.getId());
-        if (latestLog != null && payload.equals(latestLog.getTriggerPayload())) {
+        if (isDuplicateTrigger(latestLog, currentValue, payload)) {
             return;
         }
 
@@ -168,6 +168,17 @@ public class StrategyServiceImpl implements StrategyService {
         log.setResultMessage(buildTriggerResultMessage(strategy, currentValue));
         log.setExecutedAt(LocalDateTime.now());
         strategyExecutionLogMapper.insert(log);
+    }
+
+    private boolean isDuplicateTrigger(StrategyExecutionLog latestLog, BigDecimal currentValue, String payload) {
+        if (latestLog == null) {
+            return false;
+        }
+        if (latestLog.getTriggerMetricValue() != null
+                && latestLog.getTriggerMetricValue().compareTo(currentValue) == 0) {
+            return true;
+        }
+        return payload.equals(latestLog.getTriggerPayload());
     }
 
     private BigDecimal getLatestMetricValue(Strategy strategy) {

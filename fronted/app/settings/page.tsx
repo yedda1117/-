@@ -16,7 +16,6 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "@/hooks/use-toast"
 import { ApiError } from "@/lib/api-client"
 import { getDevicesStatus, type DevicesStatus } from "@/lib/device-api"
-import { getCurrentEnvironment } from "@/lib/monitoring-api"
 import { DEFAULT_PLANT_ID, getPlantApiId, getPlantOption, plantOptions, SELECTED_PLANT_STORAGE_KEY } from "@/lib/plants"
 import {
   createStrategy,
@@ -732,7 +731,6 @@ function SettingsPageContent() {
     setLogsLoading(true)
     setLogsError(null)
     try {
-      await getCurrentEnvironment(currentPlantApiId)
       const results = await Promise.all(
         sourceStrategies.map(async (strategy) => {
           const page = await listStrategyExecutionLogs({
@@ -947,10 +945,9 @@ function SettingsPageContent() {
         }
       }
       await loadStrategies()
-      await getCurrentEnvironment(currentPlantApiId)
       toast({
         title: "环境阈值已保存",
-        description: `${currentPlant?.name ?? "当前植物"} 的范围已同步，并已触发一次实时越界检查。`,
+        description: `${currentPlant?.name ?? "当前植物"} 的范围已同步到策略表。`,
       })
     } catch (error) {
       toast({
@@ -1042,11 +1039,10 @@ function SettingsPageContent() {
       setStrategySubmitError(null)
       setStrategyDialogOpen(false)
       setStrategyForm(initialFormState)
-      await getCurrentEnvironment(currentPlantApiId)
       await loadStrategies()
       toast({
         title: "策略保存成功",
-        description: "策略已保存，并已触发一次实时判断。",
+        description: "策略已保存，并刷新列表。",
       })
     } catch (error) {
       const feedback = buildFriendlyStrategySaveFeedback(error, payload, potentialNotifyConflict)
