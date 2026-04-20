@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://localhost:8080"
+// 这里的基准地址可以根据开发环境切换
+const BACKEND_BASE_URL = "https://virtserver.swaggerhub.com/x1808843327organizat/cloudPlant/1.0.0"
 
 export async function GET(req: NextRequest) {
   try {
-    const headers: HeadersInit = {}
+    const headers: HeadersInit = {
+      'accept': 'application/json',
+    }
+    
+    // 获取前端传来的 Authorization
     const authorization = req.headers.get("authorization")
-    if (authorization) headers.Authorization = authorization
+    if (authorization) {
+      headers.Authorization = authorization
+    }
 
+    // ！！！精确对齐你的 curl 接口地址：/plants
     const backendResponse = await fetch(`${BACKEND_BASE_URL}/plants`, {
       method: "GET",
       headers,
@@ -15,11 +23,28 @@ export async function GET(req: NextRequest) {
     })
 
     const responseText = await backendResponse.text()
-    let data = responseText ? JSON.parse(responseText) : null
+    let data: any = null
+    
+    try {
+      // 增加健壮性校验：只有响应存在且非空时才解析
+      data = responseText ? JSON.parse(responseText) : null
+    } catch {
+      // 如果解析失败（例如返回了 403 HTML 页面），构造一个符合前端结构的错误对象
+      data = {
+        code: backendResponse.status,
+        message: "接口返回格式异常，请检查后端地址或权限",
+        data: []
+      }
+    }
+
     return NextResponse.json(data, { status: backendResponse.status })
   } catch (error) {
     return NextResponse.json(
-      { code: 500, message: error instanceof Error ? error.message : "server error", data: [] },
+      {
+        code: 500,
+        message: error instanceof Error ? error.message : "Internal Server Error",
+        data: [],
+      },
       { status: 500 }
     )
   }

@@ -37,7 +37,6 @@ export function GlobalNavbar() {
       try {
         // 从本地存储获取 Token，保持与 page.tsx 逻辑一致
         const token = window.localStorage.getItem("plantcloud_token")
-        
         const res = await fetch("/api/plants", {
           method: "GET",
           headers: {
@@ -48,12 +47,14 @@ export function GlobalNavbar() {
         const result = await res.json()
         
         // 如果后端返回 code 200 且含有数据，则更新 Context 中的植物列表
-        if (result.code === 200 && result.data) {
-          setPlants(result.data)
-        }
-      } catch (err) {
-        console.error("Failed to fetch plants for navbar:", err)
+        if (result && Array.isArray(result)) {
+        setPlants(result) 
+      } else if (result && Array.isArray(result.data)) {
+        setPlants(result.data)
       }
+    } catch (err) {
+      console.error("Navbar 抓取失败:", err)
+    }
     }
 
     // 仅在非登录/注册页面时尝试调取数据
