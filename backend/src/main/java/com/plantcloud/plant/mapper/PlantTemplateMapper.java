@@ -52,4 +52,24 @@ public interface PlantTemplateMapper extends BaseMapper<PlantTemplate> {
             ORDER BY id ASC
             """)
     List<PlantTemplatePublicVO> selectPublicTemplates();
+
+    @Select("""
+            SELECT t.id,
+                   t.plant_name AS plantName,
+                   t.species,
+                   t.temp_min AS tempMin,
+                   t.temp_max AS tempMax,
+                   t.humidity_min AS humidityMin,
+                   t.humidity_max AS humidityMax,
+                   t.light_min AS lightMin,
+                   t.light_max AS lightMax,
+                   t.temp_rise_sensitive AS tempRiseSensitive,
+                   t.humidity_drop_sensitive AS humidityDropSensitive,
+                   t.light_rise_sensitive AS lightRiseSensitive
+            FROM plants p
+            INNER JOIN plant_template t ON p.template_id = t.id
+            WHERE p.id = #{plantId}
+            LIMIT 1
+            """)
+    PlantTemplatePublicVO selectByPlantId(@Param("plantId") Long plantId);
 }

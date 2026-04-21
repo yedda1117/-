@@ -8,6 +8,7 @@ import com.plantcloud.plant.vo.PlantTemplatePublicVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,5 +33,10 @@ public class PlantConfigController {
     @GetMapping("/templates")
     public Result<List<PlantTemplatePublicVO>> listTemplates() {
         return Result.ok(plantConfigService.listPublicTemplates());
+    }
+
+    @GetMapping("/templates/{plantId}")
+    public Result<PlantTemplatePublicVO> getTemplateByPlantId(@PathVariable("plantId") Long plantId) {
+        return Result.ok(plantConfigService.getTemplateByPlantId(plantId));
     }
 }

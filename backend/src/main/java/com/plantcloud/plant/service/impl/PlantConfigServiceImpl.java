@@ -50,6 +50,15 @@ public class PlantConfigServiceImpl implements PlantConfigService {
         return plantTemplateMapper.selectPublicTemplates();
     }
 
+    @Override
+    public PlantTemplatePublicVO getTemplateByPlantId(Long plantId) {
+        PlantTemplatePublicVO plantTemplate = plantTemplateMapper.selectByPlantId(plantId);
+        if (plantTemplate == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "Plant template not found for plantId=" + plantId);
+        }
+        return plantTemplate;
+    }
+
     private String normalizePlantName(String plantName) {
         if (!StringUtils.hasText(plantName)) {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "植物名称不能为空");

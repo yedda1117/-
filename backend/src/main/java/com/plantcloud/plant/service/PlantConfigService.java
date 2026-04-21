@@ -11,4 +11,6 @@ public interface PlantConfigService {
     PlantTemplateGenerateVO generateTemplate(PlantAiGenerateRequest request);
 
     List<PlantTemplatePublicVO> listPublicTemplates();
+
+    PlantTemplatePublicVO getTemplateByPlantId(Long plantId);
 }
