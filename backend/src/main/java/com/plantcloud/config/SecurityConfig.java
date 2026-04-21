@@ -45,8 +45,9 @@ public class SecurityConfig {
                                 "/strategies/**",
                                 "/alerts/**",
                                 "/calendar/**",
-                                "/devices/**"
-
+                                "/plants/**",
+                                "/devices/**",
+                                "/control/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

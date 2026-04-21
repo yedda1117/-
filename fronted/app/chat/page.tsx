@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react"
 import { AuthGuard } from "@/components/auth-guard"
-import { NavHeader } from "@/components/nav-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +21,7 @@ import {
 import { getDevicesStatus } from "@/lib/device-api"
 import { getPlantContextPayload, type PlantContextPayload } from "@/lib/plant-context"
 import { createStrategy, type StrategyUpsertPayload } from "@/lib/strategy-api"
+import { usePlantSelection } from "@/context/plant-selection"
 import {
   Upload,
   FileText,
@@ -219,6 +219,7 @@ function formatProposalAction(proposal: StrategyAgentProposal) {
 }
 
 export default function ChatPage() {
+  const { currentPlant } = usePlantSelection()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -280,7 +281,7 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const plantContext = await getPlantContextPayload()
+      const plantContext = await getPlantContextPayload(currentPlant)
       const history = messages.map((m) => ({
         role: m.role,
         content: m.content,
@@ -326,6 +327,7 @@ export default function ChatPage() {
           },
           body: JSON.stringify({
             message: userText,
+            chatAnswer: data.answer || "",
             plantContext,
             plantContextText: plantContext.contextText,
           }),
@@ -367,7 +369,7 @@ export default function ChatPage() {
         throw new Error("当前登录信息缺少 userId，请重新登录后再新增策略")
       }
 
-      const devicesStatus = await getDevicesStatus()
+      const devicesStatus = await getDevicesStatus(pendingPlantContext.selectedPlant.plantId)
       const targetDeviceId =
         pendingProposal.actionType === "AUTO_LIGHT"
           ? (devicesStatus?.light?.deviceId != null ? String(devicesStatus.light.deviceId) : null)
@@ -469,7 +471,6 @@ export default function ChatPage() {
   return (
     <AuthGuard>
     <div className="min-h-screen bg-gradient-to-br from-green-100/80 via-emerald-50/50 to-teal-50/60">
-      <NavHeader />
 
       <main className="container mx-auto px-4 py-2">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-100px)]">

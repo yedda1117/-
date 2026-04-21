@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
+import { ClientProviders } from "@/components/client-providers"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <body className="font-sans antialiased">
-        {children}
+        <ClientProviders>
+          {children}
+        </ClientProviders>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
