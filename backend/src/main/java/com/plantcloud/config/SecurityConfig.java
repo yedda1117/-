@@ -45,8 +45,9 @@ public class SecurityConfig {
                                 "/strategies/**",
                                 "/alerts/**",
                                 "/calendar/**",
-                                "/devices/**"
-
+                                "/devices/**",
+                                // ✅ 添加这一行：允许控制接口无需认证
+                                "/control/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
