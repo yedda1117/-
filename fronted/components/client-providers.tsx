@@ -9,12 +9,14 @@
 import type { ReactNode } from "react"
 import { PlantSelectionProvider } from "@/context/plant-selection"
 import { GlobalNavbar } from "@/components/global-navbar"
+import { Toaster } from "@/components/ui/toaster"
 
 export function ClientProviders({ children }: { children: ReactNode }) {
   return (
     <PlantSelectionProvider>
       <GlobalNavbar />
       {children}
+      <Toaster />
     </PlantSelectionProvider>
   )
 }

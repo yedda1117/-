@@ -46,13 +46,7 @@ import {
   Zap,
 } from "lucide-react"
 
-type DeviceCard = {
-  id: string
-  name: string
-  topic: string
-  online: boolean
-  latency: number | null
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PolicyLog = {
   id: string
@@ -77,10 +71,29 @@ type StrategySaveFeedback = {
   description: string
 }
 
-const initialDevices: DeviceCard[] = [
-  { id: "d1", name: "光照传感器 #1", topic: "plant/p1/sensor", online: true, latency: 23 },
-  { id: "d2", name: "风扇控制器 #1", topic: "plant/p1/fan", online: false, latency: null },
-]
+type PlantItem = {
+  id: string
+  plantName: string
+  deviceId: string
+  online: boolean
+}
+
+type AiPlantConfig = {
+  plantName: string
+  tempMin: number
+  tempMax: number
+  humidityMin: number
+  humidityMax: number
+  lightMin: number
+  lightMax: number
+  tempRiseSensitive: number
+  humidityDropSensitive: number
+  lightRiseSensitive: number
+  careLevel: string
+  summary: string
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const initialLogs: PolicyLog[] = [
   { id: "l1", time: "21:00", message: "策略引擎检测到光照偏低，已触发补光动作。", type: "info" },
@@ -99,6 +112,15 @@ const initialFormState: StrategyFormState = {
   actionType: "AUTO_LIGHT",
 }
 
+// Mock device list: #1-#6 bound, #7-#8 available
+const MOCK_DEVICES = Array.from({ length: 8 }, (_, i) => ({
+  id: `${i + 1}`,
+  label: `#${i + 1}`,
+  bound: i < 6,
+}))
+
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
 type StoredUserSnapshot = {
   rawUser: string | null
   parsedUser: unknown
@@ -113,10 +135,7 @@ function decodeBase64Url(value: string) {
 }
 
 function getUserIdFromToken(token: string | null) {
-  if (!token) {
-    return undefined
-  }
-
+  if (!token) return undefined
   try {
     const [, payload = ""] = token.split(".")
     const decoded = decodeBase64Url(payload)
@@ -128,37 +147,15 @@ function getUserIdFromToken(token: string | null) {
 }
 
 function readStoredUserSnapshot(): StoredUserSnapshot {
-  if (typeof window === "undefined") {
-    return { rawUser: null, parsedUser: null }
-  }
-
+  if (typeof window === "undefined") return { rawUser: null, parsedUser: null }
   const rawUser = window.localStorage.getItem("plantcloud_user")
   const tokenUserId = getUserIdFromToken(window.localStorage.getItem("plantcloud_token"))
-
-  if (!rawUser) {
-    return {
-      rawUser,
-      parsedUser: null,
-      tokenUserId,
-      resolvedUserId: tokenUserId,
-    }
-  }
-
+  if (!rawUser) return { rawUser, parsedUser: null, tokenUserId, resolvedUserId: tokenUserId }
   try {
     const parsedUser = JSON.parse(rawUser) as { userId?: string | number; id?: string | number }
     const localUserId =
-      parsedUser.userId != null
-        ? String(parsedUser.userId)
-        : parsedUser.id != null
-          ? String(parsedUser.id)
-          : undefined
-
-    return {
-      rawUser,
-      parsedUser,
-      tokenUserId,
-      resolvedUserId: tokenUserId ?? localUserId,
-    }
+      parsedUser.userId != null ? String(parsedUser.userId) : parsedUser.id != null ? String(parsedUser.id) : undefined
+    return { rawUser, parsedUser, tokenUserId, resolvedUserId: tokenUserId ?? localUserId }
   } catch (error) {
     return {
       rawUser,
@@ -173,19 +170,7 @@ function getCurrentUserId() {
   return readStoredUserSnapshot().resolvedUserId
 }
 
-function logStrategyPayload(stage: string, payload: StrategyUpsertPayload, extra?: Record<string, unknown>) {
-  console.group(`[strategy][${stage}]`)
-  console.log("payload", payload)
-  console.log("payload.createdBy", payload.createdBy, typeof payload.createdBy)
-  console.log("payload.targetDeviceId", payload.targetDeviceId, typeof payload.targetDeviceId)
-  console.log("payload.plantId", payload.plantId, typeof payload.plantId)
-  if (extra) {
-    Object.entries(extra).forEach(([key, value]) => {
-      console.log(key, value)
-    })
-  }
-  console.groupEnd()
-}
+// ─── Strategy helpers ─────────────────────────────────────────────────────────
 
 function buildCreatePayload(
   form: StrategyFormState,
@@ -195,9 +180,9 @@ function buildCreatePayload(
 ): StrategyUpsertPayload {
   const targetDeviceId =
     form.actionType === "AUTO_LIGHT"
-      ? (devicesStatus?.light?.deviceId != null ? String(devicesStatus.light.deviceId) : null)
+      ? devicesStatus?.light?.deviceId != null ? String(devicesStatus.light.deviceId) : null
       : form.actionType === "AUTO_FAN"
-        ? (devicesStatus?.fan?.deviceId != null ? String(devicesStatus.fan.deviceId) : null)
+        ? devicesStatus?.fan?.deviceId != null ? String(devicesStatus.fan.deviceId) : null
         : null
 
   return {
@@ -209,12 +194,7 @@ function buildCreatePayload(
     operatorType: form.operatorType,
     thresholdMin: Number(form.thresholdMin),
     actionType: form.actionType,
-    actionValue:
-      form.actionType === "AUTO_LIGHT"
-        ? "ON"
-        : form.actionType === "AUTO_FAN"
-          ? "HIGH"
-          : "INFO",
+    actionValue: form.actionType === "AUTO_LIGHT" ? "ON" : form.actionType === "AUTO_FAN" ? "HIGH" : "INFO",
     targetDeviceId,
     enabled: true,
     priority: 10,
@@ -223,19 +203,13 @@ function buildCreatePayload(
     endTime: form.timeLimitEnabled ? form.endTime : null,
     configJson: {
       timeLimitEnabled: form.timeLimitEnabled,
-      ...(form.timeLimitEnabled
-        ? {
-            startTime: form.startTime,
-            endTime: form.endTime,
-          }
-        : {}),
+      ...(form.timeLimitEnabled ? { startTime: form.startTime, endTime: form.endTime } : {}),
     },
   }
 }
 
 function buildUpdatePayload(strategy: StrategyItem, enabled: boolean): StrategyUpsertPayload {
   const config = resolveStrategyConfig(strategy)
-
   return {
     plantId: strategy.plantId,
     createdBy: strategy.createdBy,
@@ -266,80 +240,23 @@ function buildUpdatePayload(strategy: StrategyItem, enabled: boolean): StrategyU
   }
 }
 
-function validateStrategyForm(
-  form: StrategyFormState,
-  devicesStatus: DevicesStatus | null,
-  userId: string | undefined,
-) {
-  if (!userId) {
-    return "当前登录信息缺少 userId，无法满足后端 createdBy 要求，请重新登录后再试"
-  }
-
-  if (!form.strategyName.trim()) {
-    return "请输入策略名称"
-  }
-
-  if (!form.thresholdMin.trim() || Number.isNaN(Number(form.thresholdMin))) {
-    return "请输入有效的触发阈值"
-  }
-
-  if (form.timeLimitEnabled && (!form.startTime || !form.endTime)) {
-    return "请完整填写时间范围"
-  }
-
-  if (form.actionType === "AUTO_LIGHT" && !devicesStatus?.light?.deviceId) {
-    return "当前未获取到补光灯设备，暂时无法创建补光策略"
-  }
-
-  if (form.actionType === "AUTO_FAN" && !devicesStatus?.fan?.deviceId) {
-    return "当前未获取到风扇设备，暂时无法创建风扇策略"
-  }
-
+function validateStrategyForm(form: StrategyFormState, devicesStatus: DevicesStatus | null, userId: string | undefined) {
+  if (!userId) return "当前登录信息缺少 userId，无法满足后端 createdBy 要求，请重新登录后再试"
+  if (!form.strategyName.trim()) return "请输入策略名称"
+  if (!form.thresholdMin.trim() || Number.isNaN(Number(form.thresholdMin))) return "请输入有效的触发阈值"
+  if (form.timeLimitEnabled && (!form.startTime || !form.endTime)) return "请完整填写时间范围"
+  if (form.actionType === "AUTO_LIGHT" && !devicesStatus?.light?.deviceId) return "当前未获取到补光灯设备，暂时无法创建补光策略"
+  if (form.actionType === "AUTO_FAN" && !devicesStatus?.fan?.deviceId) return "当前未获取到风扇设备，暂时无法创建风扇策略"
   return null
 }
 
 function findPotentialNotifyConflict(strategies: StrategyItem[], form: StrategyFormState) {
-  if (form.actionType !== "NOTIFY_USER") {
-    return null
-  }
-
+  if (form.actionType !== "NOTIFY_USER") return null
   return (
     strategies.find(
-      (strategy) =>
-        strategy.enabled &&
-        strategy.strategyType === "CONDITION" &&
-        strategy.actionType === "NOTIFY_USER" &&
-        strategy.metricType === form.metricType,
+      (s) => s.enabled && s.strategyType === "CONDITION" && s.actionType === "NOTIFY_USER" && s.metricType === form.metricType,
     ) ?? null
   )
-}
-
-function buildStrategySaveFeedback(
-  error: unknown,
-  payload: StrategyUpsertPayload,
-  potentialConflict?: StrategyItem | null,
-): StrategySaveFeedback {
-  const message = error instanceof Error ? error.message : "保存策略失败，请稍后重试"
-
-  if (payload.actionType === "NOTIFY_USER") {
-    const isConflict =
-      (error instanceof ApiError && error.status === 409) ||
-      message.includes("冲突") ||
-      message.includes("已启用策略")
-
-    if (isConflict) {
-      const conflictName = potentialConflict?.strategyName ? `“${potentialConflict.strategyName}”` : "已有启用中的通知策略"
-      return {
-        title: "通知策略可能冲突",
-        description: `当前通知用户策略可能与${conflictName}重复或冲突。后端返回：${message}`,
-      }
-    }
-  }
-
-  return {
-    title: "保存策略失败",
-    description: message,
-  }
 }
 
 function buildFriendlyStrategySaveFeedback(
@@ -348,30 +265,23 @@ function buildFriendlyStrategySaveFeedback(
   potentialConflict?: StrategyItem | null,
 ): StrategySaveFeedback {
   const message = error instanceof Error ? error.message : "保存策略失败，请稍后重试。"
-
   if (payload.actionType === "NOTIFY_USER") {
     const isConflict =
       (error instanceof ApiError && error.status === 409) ||
       message.includes("冲突") ||
       message.includes("已启用策略")
-
     if (isConflict) {
-      const conflictName = potentialConflict?.strategyName
-        ? `“${potentialConflict.strategyName}”`
-        : "现有启用中的同类通知策略"
-
+      const conflictName = potentialConflict?.strategyName ? `"${potentialConflict.strategyName}"` : "现有启用中的同类通知策略"
       return {
         title: "通知用户策略可能冲突",
-        description: `当前“通知用户”策略很可能与 ${conflictName} 冲突，后端已拒绝保存。后端返回：${message}`,
+        description: `当前"通知用户"策略很可能与 ${conflictName} 冲突，后端已拒绝保存。后端返回：${message}`,
       }
     }
   }
-
-  return {
-    title: "保存策略失败",
-    description: message,
-  }
+  return { title: "保存策略失败", description: message }
 }
+
+// ─── Strategy Dialog ──────────────────────────────────────────────────────────
 
 function StrategyDialog({
   open,
@@ -398,63 +308,47 @@ function StrategyDialog({
         <DialogHeader>
           <DialogTitle>新建策略</DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4 py-2">
           {notifyConflictHint ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {notifyConflictHint}
             </div>
           ) : null}
-
           {submitError ? (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {submitError}
             </div>
           ) : null}
-
           <div>
             <label className="text-sm text-muted-foreground">策略名称</label>
             <Input
               className="mt-1"
               placeholder="例如：光照不足自动补光"
               value={form.strategyName}
-              onChange={(event) => onChange({ strategyName: event.target.value })}
+              onChange={(e) => onChange({ strategyName: e.target.value })}
             />
           </div>
-
           <Separator />
-
           <p className="text-sm font-medium">触发条件</p>
           <div className="grid grid-cols-3 gap-2">
-            <Select value={form.metricType} onValueChange={(value) => onChange({ metricType: value as StrategyFormState["metricType"] })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={form.metricType} onValueChange={(v) => onChange({ metricType: v as StrategyFormState["metricType"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="LIGHT">光照强度</SelectItem>
                 <SelectItem value="TEMPERATURE">温度</SelectItem>
                 <SelectItem value="HUMIDITY">湿度</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={form.operatorType} onValueChange={(value) => onChange({ operatorType: value as StrategyFormState["operatorType"] })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={form.operatorType} onValueChange={(v) => onChange({ operatorType: v as StrategyFormState["operatorType"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="LT">小于</SelectItem>
                 <SelectItem value="GT">大于</SelectItem>
                 <SelectItem value="EQ">等于</SelectItem>
               </SelectContent>
             </Select>
-
-            <Input
-              placeholder="阈值"
-              value={form.thresholdMin}
-              onChange={(event) => onChange({ thresholdMin: event.target.value })}
-            />
+            <Input placeholder="阈值" value={form.thresholdMin} onChange={(e) => onChange({ thresholdMin: e.target.value })} />
           </div>
-
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-xl bg-muted/50 p-3">
               <div className="flex items-center gap-2">
@@ -463,38 +357,23 @@ function StrategyDialog({
               </div>
               <Switch checked={form.timeLimitEnabled} onCheckedChange={(checked) => onChange({ timeLimitEnabled: checked })} />
             </div>
-
             {form.timeLimitEnabled ? (
               <div className="grid grid-cols-2 gap-3 rounded-xl border bg-background p-4">
                 <div>
                   <label className="mb-1.5 block text-xs text-muted-foreground">开始时间</label>
-                  <Input
-                    type="time"
-                    className="font-mono"
-                    value={form.startTime}
-                    onChange={(event) => onChange({ startTime: event.target.value })}
-                  />
+                  <Input type="time" className="font-mono" value={form.startTime} onChange={(e) => onChange({ startTime: e.target.value })} />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs text-muted-foreground">结束时间</label>
-                  <Input
-                    type="time"
-                    className="font-mono"
-                    value={form.endTime}
-                    onChange={(event) => onChange({ endTime: event.target.value })}
-                  />
+                  <Input type="time" className="font-mono" value={form.endTime} onChange={(e) => onChange({ endTime: e.target.value })} />
                 </div>
               </div>
             ) : null}
           </div>
-
           <Separator />
-
           <p className="text-sm font-medium">执行动作</p>
-          <Select value={form.actionType} onValueChange={(value) => onChange({ actionType: value as StrategyFormState["actionType"] })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
+          <Select value={form.actionType} onValueChange={(v) => onChange({ actionType: v as StrategyFormState["actionType"] })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="AUTO_LIGHT">开启补光灯</SelectItem>
               <SelectItem value="AUTO_FAN">启动风扇</SelectItem>
@@ -502,23 +381,441 @@ function StrategyDialog({
             </SelectContent>
           </Select>
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
-            取消
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
-            {submitting ? "提交中..." : "保存"}
-          </Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>取消</Button>
+          <Button onClick={onSubmit} disabled={submitting}>{submitting ? "提交中..." : "保存"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
+// ─── Add Plant Step Modal ─────────────────────────────────────────────────────
+
+type AddPlantStep = 1 | 2 | 3
+
+type AddPlantFormState = {
+  plantName: string
+  deviceId: string
+  tempRange: [number, number]
+  humidityRange: [number, number]
+  lightRange: [number, number]
+  tempRiseSensitive: number
+  humidityDropSensitive: number
+  lightRiseSensitive: number
+  careLevel: string
+  summary: string
+  aiPlantName: string
+}
+
+const initialAddPlantForm: AddPlantFormState = {
+  plantName: "",
+  deviceId: "",
+  tempRange: [18, 28],
+  humidityRange: [40, 70],
+  lightRange: [2000, 20000],
+  tempRiseSensitive: 3,
+  humidityDropSensitive: 2,
+  lightRiseSensitive: 2,
+  careLevel: "中等",
+  summary: "",
+  aiPlantName: "",
+}
+
+function AddPlantModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [step, setStep] = useState<AddPlantStep>(1)
+  const [form, setForm] = useState<AddPlantFormState>(initialAddPlantForm)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const patch = (p: Partial<AddPlantFormState>) => setForm((f) => ({ ...f, ...p }))
+
+  const handleClose = () => {
+    setStep(1)
+    setForm(initialAddPlantForm)
+    setError(null)
+    onClose()
+  }
+
+  const handleStep1Next = async () => {
+    if (!form.plantName.trim()) {
+      setError("请输入植物名称")
+      return
+    }
+    if (!form.deviceId) {
+      setError("请选择绑定设备")
+      return
+    }
+    setError(null)
+    setAiLoading(true)
+    try {
+      const res = await fetch("/api/plant-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plantName: form.plantName.trim() }),
+      })
+      const json = await res.json()
+      const data: AiPlantConfig = json.data
+      patch({
+        tempRange: [data.tempMin, data.tempMax],
+        humidityRange: [data.humidityMin, data.humidityMax],
+        lightRange: [data.lightMin, data.lightMax],
+        tempRiseSensitive: data.tempRiseSensitive,
+        humidityDropSensitive: data.humidityDropSensitive,
+        lightRiseSensitive: data.lightRiseSensitive,
+        careLevel: data.careLevel,
+        summary: data.summary,
+        aiPlantName: data.plantName,
+      })
+      setStep(2)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI 生成失败，请重试")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleStep2Next = () => {
+    setError(null)
+    setStep(3)
+  }
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const token = typeof window !== "undefined" ? window.localStorage.getItem("plantcloud_token") : null
+      const headers: HeadersInit = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const payload = {
+        plantName: form.plantName.trim(),
+        templateData: {
+          plantName: form.plantName.trim(),
+          species: " ",
+          tempMin: form.tempRange[0],
+          tempMax: form.tempRange[1],
+          humidityMin: form.humidityRange[0],
+          humidityMax: form.humidityRange[1],
+          lightMin: form.lightRange[0],
+          lightMax: form.lightRange[1],
+          tempRiseSensitive: form.tempRiseSensitive,
+          humidityDropSensitive: form.humidityDropSensitive,
+          lightRiseSensitive: form.lightRiseSensitive,
+          careLevel: form.careLevel,
+          summary: form.summary,
+        },
+      }
+
+      const res = await fetch("/api/plants", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      })
+
+      // 尝试解析响应体，无论成功失败
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        // 提取后端错误信息，优先取 message 字段，其次取 code
+        const backendMsg = json?.message ?? json?.msg ?? json?.error ?? null
+        const backendCode = json?.code ?? res.status
+        const errorText = backendMsg
+          ? `${backendMsg}（错误码：${backendCode}）`
+          : `绑定失败，错误码：${backendCode}`
+        throw new Error(errorText)
+      }
+
+      // 成功：toast 提示 + 关闭弹窗 + 刷新列表
+      toast({ title: "绑定成功 🌱", description: `${form.plantName} 已成功绑定到设备 #${form.deviceId}。` })
+      handleClose()
+      onSuccess()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "绑定失败，请重试"
+      // 同时在弹窗内显示错误 + 弹出 toast
+      setError(msg)
+      toast({ title: "绑定失败", description: msg, variant: "destructive" })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const careLevelColor =
+    form.careLevel === "简单" ? "bg-green-100 text-green-700" :
+    form.careLevel === "中等" ? "bg-yellow-100 text-yellow-700" :
+    "bg-red-100 text-red-700"
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Leaf className="h-5 w-5 text-primary" />
+            新增植物
+          </DialogTitle>
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 pt-1">
+            {([1, 2, 3] as const).map((s) => (
+              <div key={s} className="flex items-center gap-1">
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+                    step === s ? "bg-primary text-primary-foreground" :
+                    step > s ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step > s ? "✓" : s}
+                </div>
+                {s < 3 && <div className={`h-px w-8 ${step > s ? "bg-green-500" : "bg-muted"}`} />}
+              </div>
+            ))}
+            <span className="ml-2 text-xs text-muted-foreground">
+              {step === 1 ? "基础信息" : step === 2 ? "阈值确认" : "确认绑定"}
+            </span>
+          </div>
+        </DialogHeader>
+
+        {error ? (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        {/* ── Step 1 ── */}
+        {step === 1 && (
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">植物名称</label>
+              <Input
+                placeholder="例如：薄荷、绿萝、多肉..."
+                value={form.plantName}
+                onChange={(e) => patch({ plantName: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">绑定设备</label>
+              <Select value={form.deviceId} onValueChange={(v) => patch({ deviceId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择设备" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_DEVICES.map((d) => (
+                    <SelectItem
+                      key={d.id}
+                      value={d.id}
+                      disabled={d.bound}
+                      className={d.bound ? "text-muted-foreground" : ""}
+                    >
+                      <span title={d.bound ? "已绑定植物" : "未绑定植物"}>
+                        设备 {d.label}
+                        {d.bound ? " （已绑定）" : " （可用）"}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2 ── */}
+        {step === 2 && (
+          <div className="space-y-5 py-2">
+            {/* Env thresholds */}
+            <div>
+              <p className="mb-3 text-sm font-medium">环境阈值设置</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Thermometer className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium">温度范围</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {form.tempRange[0]}°C – {form.tempRange[1]}°C
+                    </span>
+                  </div>
+                  <Slider
+                    value={form.tempRange}
+                    min={0}
+                    max={50}
+                    step={1}
+                    onValueChange={(v) => patch({ tempRange: v as [number, number] })}
+                  />
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Droplets className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium">湿度范围</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {form.humidityRange[0]}% – {form.humidityRange[1]}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={form.humidityRange}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(v) => patch({ humidityRange: v as [number, number] })}
+                  />
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm font-medium">光照范围</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {form.lightRange[0].toLocaleString()} – {form.lightRange[1].toLocaleString()} lux
+                    </span>
+                  </div>
+                  <Slider
+                    value={form.lightRange}
+                    min={0}
+                    max={50000}
+                    step={100}
+                    onValueChange={(v) => patch({ lightRange: v as [number, number] })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Sensitivity */}
+            <div>
+              <p className="mb-3 text-sm font-medium">敏感度</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">温度敏感度</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={form.tempRiseSensitive}
+                    onChange={(e) => patch({ tempRiseSensitive: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">湿度敏感度</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={form.humidityDropSensitive}
+                    onChange={(e) => patch({ humidityDropSensitive: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">光照敏感度</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={form.lightRiseSensitive}
+                    onChange={(e) => patch({ lightRiseSensitive: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Care level + summary */}
+            <div className="flex items-start gap-4">
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={`flex h-14 w-14 items-center justify-center rounded-full text-sm font-semibold shadow-sm ${careLevelColor}`}
+                >
+                  {form.careLevel}
+                </div>
+                <span className="text-xs text-muted-foreground">养护难度</span>
+              </div>
+              <p className="flex-1 pt-1 text-sm italic text-muted-foreground leading-relaxed">
+                {form.summary || "暂无总结"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3 ── */}
+        {step === 3 && (
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">请确认以下绑定信息：</p>
+            <div className="rounded-xl border bg-muted/30 p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">植物名称</span>
+                <span className="font-medium">{form.plantName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">绑定设备</span>
+                <span className="font-medium">设备 #{form.deviceId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">温度范围</span>
+                <span className="font-medium">{form.tempRange[0]}°C – {form.tempRange[1]}°C</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">湿度范围</span>
+                <span className="font-medium">{form.humidityRange[0]}% – {form.humidityRange[1]}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">光照范围</span>
+                <span className="font-medium">{form.lightRange[0].toLocaleString()} – {form.lightRange[1].toLocaleString()} lux</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">养护难度</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${careLevelColor}`}>{form.careLevel}</span>
+              </div>
+            </div>
+            <p className="text-xs italic text-muted-foreground">{form.summary}</p>
+          </div>
+        )}
+
+        <DialogFooter>
+          {step > 1 && (
+            <Button variant="outline" onClick={() => setStep((s) => (s - 1) as AddPlantStep)} disabled={submitting || aiLoading}>
+              上一步
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleClose} disabled={submitting || aiLoading}>
+            取消
+          </Button>
+          {step === 1 && (
+            <Button onClick={handleStep1Next} disabled={aiLoading}>
+              {aiLoading ? "等待ai提供参考值中..." : "下一步"}
+            </Button>
+          )}
+          {step === 2 && (
+            <Button onClick={handleStep2Next}>下一步</Button>
+          )}
+          {step === 3 && (
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "绑定中..." : "绑定新植物"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 function SettingsPageContent() {
   const searchParams = useSearchParams()
-  const [devices, setDevices] = useState<DeviceCard[]>(initialDevices)
   const [selectedPlantId, setSelectedPlantId] = useState(DEFAULT_PLANT_ID)
   const [strategies, setStrategies] = useState<StrategyItem[]>([])
   const [devicesStatus, setDevicesStatus] = useState<DevicesStatus | null>(null)
@@ -533,23 +830,31 @@ function SettingsPageContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [logs] = useState<PolicyLog[]>(initialLogs)
 
+  // Plant binding state
+  const [plants, setPlants] = useState<PlantItem[]>([])
+  const [plantsLoading, setPlantsLoading] = useState(true)
+  const [addPlantOpen, setAddPlantOpen] = useState(false)
+  // UI-only removed plant ids (not persisted)
+  const [removedPlantIds, setRemovedPlantIds] = useState<Set<string>>(new Set())
+
   const currentPlant = getPlantOption(selectedPlantId)
   const currentPlantApiId = getPlantApiId(selectedPlantId)
   const potentialNotifyConflict = findPotentialNotifyConflict(strategies, strategyForm)
   const notifyConflictHint =
     potentialNotifyConflict && strategyForm.actionType === "NOTIFY_USER"
-      ? `已存在启用中的同类通知策略“${potentialNotifyConflict.strategyName}”，本次保存可能发生冲突，最终以后端校验结果为准。`
+      ? `已存在启用中的同类通知策略"${potentialNotifyConflict.strategyName}"，本次保存可能发生冲突，最终以后端校验结果为准。`
       : null
+
+  const visiblePlants = plants.filter((p) => !removedPlantIds.has(p.id))
 
   useEffect(() => {
     const plantFromQuery = searchParams.get("plant")
-    if (plantFromQuery && plantOptions.some((plant) => plant.id === plantFromQuery)) {
+    if (plantFromQuery && plantOptions.some((p) => p.id === plantFromQuery)) {
       setSelectedPlantId(plantFromQuery)
       return
     }
-
     const storedPlant = window.localStorage.getItem(SELECTED_PLANT_STORAGE_KEY)
-    if (storedPlant && plantOptions.some((plant) => plant.id === storedPlant)) {
+    if (storedPlant && plantOptions.some((p) => p.id === storedPlant)) {
       setSelectedPlantId(storedPlant)
     }
   }, [searchParams])
@@ -557,6 +862,30 @@ function SettingsPageContent() {
   useEffect(() => {
     window.localStorage.setItem(SELECTED_PLANT_STORAGE_KEY, selectedPlantId)
   }, [selectedPlantId])
+
+  const loadPlants = async () => {
+    setPlantsLoading(true)
+    try {
+      const token = typeof window !== "undefined" ? window.localStorage.getItem("plantcloud_token") : null
+      const headers: HeadersInit = { accept: "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const res = await fetch("/api/plants", { headers, cache: "no-store" })
+      const json = await res.json()
+      const raw: unknown[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      const mapped: PlantItem[] = raw.map((item: any) => ({
+        id: String(item.id ?? item.plantId ?? Math.random()),
+        plantName: item.plantName ?? item.name ?? "未知植物",
+        deviceId: String(item.deviceId ?? item.bindDeviceId ?? "—"),
+        online: item.onlineStatus === "ONLINE" || item.online === true,
+      }))
+      setPlants(mapped)
+      setRemovedPlantIds(new Set()) // reset on reload
+    } catch {
+      setPlants([])
+    } finally {
+      setPlantsLoading(false)
+    }
+  }
 
   const loadStrategies = async () => {
     setStrategiesLoading(true)
@@ -568,11 +897,7 @@ function SettingsPageContent() {
       const message = error instanceof Error ? error.message : "策略列表加载失败"
       setStrategies([])
       setStrategiesError(message)
-      toast({
-        title: "策略列表加载失败",
-        description: message,
-        variant: "destructive",
-      })
+      toast({ title: "策略列表加载失败", description: message, variant: "destructive" })
     } finally {
       setStrategiesLoading(false)
     }
@@ -584,231 +909,59 @@ function SettingsPageContent() {
       const status = await getDevicesStatus(currentPlantApiId)
       setDevicesStatus(status)
     } catch (error) {
-      toast({
-        title: "设备状态加载失败",
-        description: error instanceof Error ? error.message : "请稍后重试",
-        variant: "destructive",
-      })
+      toast({ title: "设备状态加载失败", description: error instanceof Error ? error.message : "请稍后重试", variant: "destructive" })
     } finally {
       setDevicesLoading(false)
     }
   }
 
-  useEffect(() => {
-    void loadStrategies()
-  }, [currentPlantApiId])
-
-  useEffect(() => {
-    void loadDevicesStatus()
-  }, [])
-
-  useEffect(() => {
-    if (!devicesStatus) {
-      return
-    }
-
-    setDevices((currentDevices) =>
-      currentDevices.map((device) => {
-        if (device.id === "d1") {
-          return {
-            ...device,
-            name: devicesStatus.light?.deviceName ?? device.name,
-            topic: devicesStatus.light?.deviceCode ?? device.topic,
-            online: devicesStatus.light?.onlineStatus === "ONLINE",
-          }
-        }
-
-        if (device.id === "d2") {
-          return {
-            ...device,
-            name: devicesStatus.fan?.deviceName ?? device.name,
-            topic: devicesStatus.fan?.deviceCode ?? device.topic,
-            online: devicesStatus.fan?.onlineStatus === "ONLINE",
-          }
-        }
-
-        return device
-      }),
-    )
-  }, [devicesStatus])
-
-  const handleCreateStrategy = async () => {
-    const userSnapshot = readStoredUserSnapshot()
-    const currentUserId = userSnapshot.resolvedUserId
-    setStrategySubmitError(null)
-    const validationMessage = validateStrategyForm(strategyForm, devicesStatus, currentUserId)
-    if (validationMessage) {
-      toast({
-        title: "表单校验失败",
-        description: validationMessage,
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const payload = buildCreatePayload(strategyForm, currentPlantApiId, currentUserId, devicesStatus)
-      logStrategyPayload("create:before-request", payload, {
-        "localStorage.plantcloud_user": userSnapshot.rawUser,
-        parsedUser: userSnapshot.parsedUser,
-        tokenUserId: userSnapshot.tokenUserId,
-        resolvedUserId: userSnapshot.resolvedUserId,
-        "typeof resolvedUserId": typeof userSnapshot.resolvedUserId,
-      })
-      if (payload.actionType === "NOTIFY_USER" && potentialNotifyConflict) {
-        toast({
-          title: "通知策略可能冲突",
-          description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，最终以后端校验结果为准。",
-          variant: "destructive",
-        })
-      }
-      await createStrategy(payload)
-      toast({
-        title: "策略已创建",
-        description: "新策略已经同步到后端。",
-      })
-      setStrategyDialogOpen(false)
-      setStrategyForm(initialFormState)
-      await loadStrategies()
-    } catch (error) {
-      toast({
-        title: "创建策略失败",
-        description: error instanceof Error ? error.message : "请稍后重试",
-        variant: "destructive",
-      })
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  useEffect(() => { void loadPlants() }, [])
+  useEffect(() => { void loadStrategies() }, [currentPlantApiId])
+  useEffect(() => { void loadDevicesStatus() }, [])
 
   const handleToggleStrategy = async (strategy: StrategyItem, nextEnabled: boolean) => {
     setTogglingId(strategy.id)
-    setStrategies((current) => current.map((item) => (item.id === strategy.id ? { ...item, enabled: nextEnabled } : item)))
-
+    setStrategies((cur) => cur.map((item) => (item.id === strategy.id ? { ...item, enabled: nextEnabled } : item)))
     try {
       const detail = await getStrategyDetail(strategy.id)
       const payload = buildUpdatePayload(detail, nextEnabled)
-      logStrategyPayload("toggle:before-request", payload, {
-        strategyId: strategy.id,
-        "typeof strategyId": typeof strategy.id,
-        detailCreatedBy: detail.createdBy,
-        "typeof detailCreatedBy": typeof detail.createdBy,
-      })
       await updateStrategy(strategy.id, payload)
       await loadStrategies()
     } catch (error) {
-      setStrategies((current) => current.map((item) => (item.id === strategy.id ? { ...item, enabled: strategy.enabled } : item)))
-      toast({
-        title: "更新策略失败",
-        description: error instanceof Error ? error.message : "请稍后重试",
-        variant: "destructive",
-      })
+      setStrategies((cur) => cur.map((item) => (item.id === strategy.id ? { ...item, enabled: strategy.enabled } : item)))
+      toast({ title: "更新策略失败", description: error instanceof Error ? error.message : "请稍后重试", variant: "destructive" })
     } finally {
       setTogglingId(null)
     }
   }
 
   const handleDeleteStrategy = async (strategy: StrategyItem) => {
-    if (!window.confirm(`确认删除策略「${strategy.strategyName}」吗？`)) {
-      return
-    }
-
+    if (!window.confirm(`确认删除策略「${strategy.strategyName}」吗？`)) return
     setDeletingId(strategy.id)
     try {
-      console.log("[strategy][delete:before-request]", {
-        strategyId: strategy.id,
-        typeofStrategyId: typeof strategy.id,
-      })
       await deleteStrategy(strategy.id)
-      setStrategies((current) => current.filter((item) => item.id !== strategy.id))
-      toast({
-        title: "策略已删除",
-      })
+      setStrategies((cur) => cur.filter((item) => item.id !== strategy.id))
+      toast({ title: "策略已删除" })
     } catch (error) {
-      toast({
-        title: "删除策略失败",
-        description: error instanceof Error ? error.message : "请稍后重试",
-        variant: "destructive",
-      })
+      toast({ title: "删除策略失败", description: error instanceof Error ? error.message : "请稍后重试", variant: "destructive" })
     } finally {
       setDeletingId(null)
-    }
-  }
-
-  const handleCreateStrategyEnhanced = async () => {
-    const currentUserId = getCurrentUserId()
-    setStrategySubmitError(null)
-
-    const validationMessage = validateStrategyForm(strategyForm, devicesStatus, currentUserId)
-    if (validationMessage) {
-      setStrategySubmitError(validationMessage)
-      toast({
-        title: "表单校验失败",
-        description: validationMessage,
-        variant: "destructive",
-      })
-      return
-    }
-
-    const payload = buildCreatePayload(strategyForm, currentPlantApiId, currentUserId, devicesStatus)
-
-    if (payload.actionType === "NOTIFY_USER" && potentialNotifyConflict) {
-      toast({
-        title: "通知策略可能冲突",
-        description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，最终以后端校验结果为准。",
-        variant: "destructive",
-      })
-    }
-
-    setSubmitting(true)
-    try {
-      await createStrategy(payload)
-      setStrategySubmitError(null)
-      setStrategyDialogOpen(false)
-      setStrategyForm(initialFormState)
-      await loadStrategies()
-      toast({
-        title: "策略保存成功",
-        description: "新策略已创建，并已刷新当前列表。",
-      })
-    } catch (error) {
-      const feedback = buildStrategySaveFeedback(error, payload, potentialNotifyConflict)
-      setStrategySubmitError(feedback.description)
-      toast({
-        title: feedback.title,
-        description: feedback.description,
-        variant: "destructive",
-      })
-    } finally {
-      setSubmitting(false)
     }
   }
 
   const handleCreateStrategyFriendly = async () => {
     const currentUserId = getCurrentUserId()
     setStrategySubmitError(null)
-
     const validationMessage = validateStrategyForm(strategyForm, devicesStatus, currentUserId)
     if (validationMessage) {
       setStrategySubmitError(validationMessage)
-      toast({
-        title: "表单校验失败",
-        description: validationMessage,
-        variant: "destructive",
-      })
+      toast({ title: "表单校验失败", description: validationMessage, variant: "destructive" })
       return
     }
-
     const payload = buildCreatePayload(strategyForm, currentPlantApiId, currentUserId, devicesStatus)
-
     if (payload.actionType === "NOTIFY_USER" && potentialNotifyConflict) {
-      toast({
-        title: "通知策略可能冲突",
-        description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，保存时可能被后端判定为冲突。",
-      })
+      toast({ title: "通知策略可能冲突", description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，保存时可能被后端判定为冲突。" })
     }
-
     setSubmitting(true)
     try {
       await createStrategy(payload)
@@ -816,18 +969,11 @@ function SettingsPageContent() {
       setStrategyDialogOpen(false)
       setStrategyForm(initialFormState)
       await loadStrategies()
-      toast({
-        title: "策略保存成功",
-        description: "策略已保存并刷新列表。",
-      })
+      toast({ title: "策略保存成功", description: "策略已保存并刷新列表。" })
     } catch (error) {
       const feedback = buildFriendlyStrategySaveFeedback(error, payload, potentialNotifyConflict)
       setStrategySubmitError(feedback.description)
-      toast({
-        title: feedback.title,
-        description: feedback.description,
-        variant: "destructive",
-      })
+      toast({ title: feedback.title, description: feedback.description, variant: "destructive" })
     } finally {
       setSubmitting(false)
     }
@@ -836,49 +982,62 @@ function SettingsPageContent() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
-
         <main className="container mx-auto max-w-4xl px-6 py-8">
           <h1 className="mb-6 text-2xl font-bold">系统设置</h1>
 
           <div className="space-y-6">
+            {/* ── 植物绑定管理 ── */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Wifi className="h-5 w-5 text-primary" />
-                  设备连接管理
+                  <Leaf className="h-5 w-5 text-primary" />
+                  植物绑定管理
                 </CardTitle>
-                <CardDescription>保留现有设备展示样式，策略动作会优先使用后端返回的设备信息。</CardDescription>
+                <CardDescription>管理已绑定的植物及其关联设备。</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {devices.map((device) => (
-                  <div key={device.id} className="flex items-center justify-between rounded-xl border bg-muted/50 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-2.5 w-2.5 rounded-full ${device.online ? "bg-green-500 animate-pulse" : "bg-gray-400"}`} />
+                {plantsLoading ? (
+                  <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+                    正在加载植物列表...
+                  </div>
+                ) : visiblePlants.length === 0 ? (
+                  <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+                    暂无绑定植物，点击下方按钮添加第一株植物。
+                  </div>
+                ) : (
+                  visiblePlants.map((plant) => (
+                    <div key={plant.id} className="flex items-center justify-between rounded-xl border bg-muted/50 p-4">
                       <div>
-                        <p className="text-sm font-medium">{device.name}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{device.topic}</p>
+                        <p className="text-sm font-medium">{plant.plantName}</p>
+                        <p className="text-xs text-muted-foreground">绑定设备 ID：{plant.deviceId}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={plant.online ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
+                          {plant.online ? "在线" : "离线"}
+                        </Badge>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setRemovedPlantIds((prev) => new Set([...prev, plant.id]))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={device.online ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
-                        {device.online ? `在线 ${device.latency ?? "--"}ms` : "离线"}
-                      </Badge>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                <Button variant="outline" className="w-full" disabled>
+                  ))
+                )}
+                <Button variant="outline" className="w-full" onClick={() => setAddPlantOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  新增设备
+                  新增植物
                 </Button>
               </CardContent>
             </Card>
 
+            {/* ── 自动化策略管理 ── */}
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
@@ -903,26 +1062,21 @@ function SettingsPageContent() {
                     正在加载策略列表...
                   </div>
                 ) : null}
-
                 {!strategiesLoading && strategiesError ? (
                   <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-6 text-sm text-destructive">
                     {strategiesError}
                   </div>
                 ) : null}
-
                 {!strategiesLoading && !strategiesError && strategies.length === 0 ? (
                   <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-10 text-center text-sm text-muted-foreground">
                     当前植物还没有策略，点击下方按钮创建第一条自动化策略。
                   </div>
                 ) : null}
-
                 {!strategiesLoading && !strategiesError
                   ? strategies.map((strategy) => (
                       <div
                         key={strategy.id}
-                        className={`rounded-xl border p-4 transition-colors ${
-                          strategy.enabled ? "bg-muted/50" : "bg-muted/20 opacity-70"
-                        }`}
+                        className={`rounded-xl border p-4 transition-colors ${strategy.enabled ? "bg-muted/50" : "bg-muted/20 opacity-70"}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -938,10 +1092,7 @@ function SettingsPageContent() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                               <span className="font-medium text-green-600">则</span>{" "}
-                              {formatStrategyAction(strategy, {
-                                light: devicesStatus?.light,
-                                fan: devicesStatus?.fan,
-                              })}
+                              {formatStrategyAction(strategy, { light: devicesStatus?.light, fan: devicesStatus?.fan })}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
@@ -964,18 +1115,17 @@ function SettingsPageContent() {
                       </div>
                     ))
                   : null}
-
                 <Button variant="outline" className="w-full" onClick={() => setStrategyDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   新建策略
                 </Button>
-
                 {devicesLoading ? (
                   <p className="text-xs text-muted-foreground">正在同步设备状态，用于补全策略动作中的设备信息...</p>
                 ) : null}
               </CardContent>
             </Card>
 
+            {/* ── 策略日志 ── */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -996,15 +1146,7 @@ function SettingsPageContent() {
                         {log.type === "warning" ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" /> : null}
                         {log.type === "success" ? <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" /> : null}
                         {log.type === "info" ? <Zap className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" /> : null}
-                        <p
-                          className={`text-sm ${
-                            log.type === "warning"
-                              ? "text-yellow-700"
-                              : log.type === "success"
-                                ? "text-green-700"
-                                : "text-foreground"
-                          }`}
-                        >
+                        <p className={`text-sm ${log.type === "warning" ? "text-yellow-700" : log.type === "success" ? "text-green-700" : "text-foreground"}`}>
                           {log.message}
                         </p>
                       </div>
@@ -1016,54 +1158,7 @@ function SettingsPageContent() {
 
             <Separator />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Thermometer className="h-5 w-5 text-primary" />
-                  环境阈值设置
-                </CardTitle>
-                <CardDescription>保留原页面的其他设置区域，不参与本次策略联调。</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Thermometer className="h-4 w-4 text-orange-500" />
-                      <span className="font-medium">温度范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">18°C - 30°C</span>
-                  </div>
-                  <Slider defaultValue={[18, 30]} min={0} max={50} step={1} />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Droplets className="h-4 w-4 text-blue-500" />
-                      <span className="font-medium">湿度范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">40% - 80%</span>
-                  </div>
-                  <Slider defaultValue={[40, 80]} min={0} max={100} step={1} />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4 text-amber-500" />
-                      <span className="font-medium">光照范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">300 - 30,000 lux</span>
-                  </div>
-                  <Slider defaultValue={[300, 30000]} min={0} max={50000} step={100} />
-                </div>
-              </CardContent>
-            </Card>
-
+            {/* ── 通知设置 ── */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1090,6 +1185,7 @@ function SettingsPageContent() {
               </CardContent>
             </Card>
 
+            {/* ── 应用信息 ── */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1134,9 +1230,15 @@ function SettingsPageContent() {
           }}
           onChange={(patch) => {
             setStrategySubmitError(null)
-            setStrategyForm((current) => ({ ...current, ...patch }))
+            setStrategyForm((cur) => ({ ...cur, ...patch }))
           }}
           onSubmit={() => void handleCreateStrategyFriendly()}
+        />
+
+        <AddPlantModal
+          open={addPlantOpen}
+          onClose={() => setAddPlantOpen(false)}
+          onSuccess={() => void loadPlants()}
         />
       </div>
     </AuthGuard>
