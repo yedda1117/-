@@ -8,11 +8,13 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("gps_location_logs")
+@TableName("gps_location")
 public class GpsLocationLog {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+
+    private Long plantId;
 
     private Long deviceId;
 

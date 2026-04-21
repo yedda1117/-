@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/plants/**",
                                 "/monitoring/**",
                                 "/visualization/**",
+                                "/gps/**",
                                 "/devices/**",
                                 "/control/**"
                         ).permitAll()

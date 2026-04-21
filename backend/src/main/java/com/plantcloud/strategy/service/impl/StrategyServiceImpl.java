@@ -516,6 +516,9 @@ public class StrategyServiceImpl implements StrategyService {
 
     private String buildConfigJson(StrategyUpsertDTO request) {
         Map<String, Object> config = new LinkedHashMap<>();
+        if (request.getConfigJson() != null) {
+            config.putAll(request.getConfigJson());
+        }
         Boolean timeLimitEnabled = getTimeLimitEnabled(request);
         if (timeLimitEnabled != null) {
             config.put("timeLimitEnabled", timeLimitEnabled);
