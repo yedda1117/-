@@ -72,6 +72,9 @@ export async function POST(req: NextRequest) {
       body: body, // 直接透传，不要再在 route.ts 里二次构造转换
     })
 
+    console.log("正在转发请求到后端:", `${BACKEND_BASE_URL}/plants`);
+    console.log("请求体内容:", body);
+
     const responseText = await backendResponse.text()
     let data: unknown = null
     try {

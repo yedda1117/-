@@ -73,12 +73,11 @@ type StrategySaveFeedback = {
   description: string
 }
 
-<<<<<<< HEAD
 type PlantItem = {
   id: string
   plantName: string
   deviceId: string
-  online: boolean
+  status?: string // ACTIVE, INACTIVE, DELETED
 }
 
 type AiPlantConfig = {
@@ -97,43 +96,6 @@ type AiPlantConfig = {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-=======
-type EnvironmentMetricKey = "temperature" | "humidity" | "light"
-
-type EnvironmentRangeState = Record<EnvironmentMetricKey, [number, number]>
-
-const defaultEnvironmentRanges: EnvironmentRangeState = {
-  temperature: [18, 30],
-  humidity: [40, 80],
-  light: [300, 30000],
-}
-
-const environmentRangeStrategies: Record<
-  EnvironmentMetricKey,
-  { metricType: "TEMPERATURE" | "HUMIDITY" | "LIGHT"; strategyName: string; label: string }
-> = {
-  temperature: {
-    metricType: "TEMPERATURE",
-    strategyName: "环境阈值-温度范围",
-    label: "温度",
-  },
-  humidity: {
-    metricType: "HUMIDITY",
-    strategyName: "环境阈值-湿度范围",
-    label: "湿度",
-  },
-  light: {
-    metricType: "LIGHT",
-    strategyName: "环境阈值-光照范围",
-    label: "光照",
-  },
-}
-
-const initialDevices: DeviceCard[] = [
-  { id: "d1", name: "光照传感器 #1", topic: "plant/p1/sensor", online: true, latency: 23 },
-  { id: "d2", name: "风扇控制器 #1", topic: "plant/p1/fan", online: false, latency: null },
-]
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
 
 const initialFormState: StrategyFormState = {
   strategyName: "",
@@ -274,7 +236,6 @@ function buildUpdatePayload(strategy: StrategyItem, enabled: boolean): StrategyU
   }
 }
 
-<<<<<<< HEAD
 function validateStrategyForm(form: StrategyFormState, devicesStatus: DevicesStatus | null, userId: string | undefined) {
   if (!userId) return "当前登录信息缺少 userId，无法满足后端 createdBy 要求，请重新登录后再试"
   if (!form.strategyName.trim()) return "请输入策略名称"
@@ -282,132 +243,6 @@ function validateStrategyForm(form: StrategyFormState, devicesStatus: DevicesSta
   if (form.timeLimitEnabled && (!form.startTime || !form.endTime)) return "请完整填写时间范围"
   if (form.actionType === "AUTO_LIGHT" && !devicesStatus?.light?.deviceId) return "当前未获取到补光灯设备，暂时无法创建补光策略"
   if (form.actionType === "AUTO_FAN" && !devicesStatus?.fan?.deviceId) return "当前未获取到风扇设备，暂时无法创建风扇策略"
-=======
-function findEnvironmentRangeStrategy(strategies: StrategyItem[], key: EnvironmentMetricKey) {
-  const setting = environmentRangeStrategies[key]
-  return strategies.find(
-    (strategy) =>
-      strategy.metricType === setting.metricType &&
-      strategy.operatorType === "BETWEEN" &&
-      strategy.actionType === "NOTIFY_USER" &&
-      strategy.strategyName === setting.strategyName,
-  )
-}
-
-function buildEnvironmentRangePayload(
-  key: EnvironmentMetricKey,
-  range: [number, number],
-  plantId: number,
-  userId: string | undefined,
-  existing?: StrategyItem,
-): StrategyUpsertPayload {
-  const setting = environmentRangeStrategies[key]
-  return {
-    plantId: String(plantId),
-    createdBy: existing?.createdBy ?? userId,
-    strategyName: setting.strategyName,
-    strategyType: "CONDITION",
-    metricType: setting.metricType,
-    operatorType: "BETWEEN",
-    thresholdMin: range[0],
-    thresholdMax: range[1],
-    actionType: "NOTIFY_USER",
-    actionValue: "WARNING",
-    targetDeviceId: null,
-    cronExpr: null,
-    enabled: true,
-    priority: existing?.priority ?? 20,
-    timeLimitEnabled: false,
-    startTime: null,
-    endTime: null,
-    notifyTitleTemplate: `${setting.label}超出可接受范围`,
-    notifyContentTemplate: `${setting.label}当前值已超出设置范围，请及时查看植物状态。`,
-    configJson: {
-      timeLimitEnabled: false,
-      notifyTitleTemplate: `${setting.label}超出可接受范围`,
-      notifyContentTemplate: `${setting.label}当前值已超出设置范围，请及时查看植物状态。`,
-    },
-  }
-}
-
-function formatLogTime(executedAt?: string | null) {
-  if (!executedAt) {
-    return "--:--"
-  }
-  const date = new Date(executedAt)
-  if (Number.isNaN(date.getTime())) {
-    return executedAt.slice(11, 16) || "--:--"
-  }
-  return date.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-}
-
-function formatStrategyLogAction(strategy?: StrategyItem) {
-  if (!strategy) {
-    return "执行了预设动作"
-  }
-
-  if (strategy.actionType === "AUTO_LIGHT") {
-    return strategy.actionValue === "OFF" ? "关闭补光灯" : "开启补光灯"
-  }
-
-  if (strategy.actionType === "AUTO_FAN") {
-    return "开启风扇"
-  }
-
-  if (strategy.actionType === "NOTIFY_USER") {
-    return "发送提醒通知"
-  }
-
-  return "执行了预设动作"
-}
-
-function toPolicyLog(log: StrategyExecutionLogItem, strategy?: StrategyItem): PolicyLog {
-  const result = (log.executionResult || "").toUpperCase()
-  const strategyName = strategy?.strategyName ?? `策略 #${log.strategyId}`
-  const actionText = formatStrategyLogAction(strategy)
-  const success = result === "SUCCESS" || result === "TRIGGERED"
-  return {
-    id: String(log.id),
-    time: formatLogTime(log.executedAt),
-    message: success ? `${strategyName} 策略已经执行，${actionText}。` : `${strategyName} 策略执行失败。`,
-    type: success ? "success" : "warning",
-  }
-}
-
-function validateStrategyForm(
-  form: StrategyFormState,
-  devicesStatus: DevicesStatus | null,
-  userId: string | undefined,
-) {
-  if (!userId) {
-    return "当前登录信息缺少 userId，无法满足后端 createdBy 要求，请重新登录后再试"
-  }
-
-  if (!form.strategyName.trim()) {
-    return "请输入策略名称"
-  }
-
-  if (!form.thresholdMin.trim() || Number.isNaN(Number(form.thresholdMin))) {
-    return "请输入有效的触发阈值"
-  }
-
-  if (form.timeLimitEnabled && (!form.startTime || !form.endTime)) {
-    return "请完整填写时间范围"
-  }
-
-  if (form.actionType === "AUTO_LIGHT" && !devicesStatus?.light?.deviceId) {
-    return "当前未获取到补光灯设备，暂时无法创建补光策略"
-  }
-
-  if (form.actionType === "AUTO_FAN" && !devicesStatus?.fan?.deviceId) {
-    return "当前未获取到风扇设备，暂时无法创建风扇策略"
-  }
-
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
   return null
 }
 
@@ -711,8 +546,8 @@ function AddPlantModal({
   }
 
   const careLevelColor =
-    form.careLevel === "简单" ? "bg-green-100 text-green-700" :
-    form.careLevel === "中等" ? "bg-yellow-100 text-yellow-700" :
+    form.careLevel === "easy" ? "bg-green-100 text-green-700" :
+    form.careLevel === "medium" ? "bg-yellow-100 text-yellow-700" :
     "bg-red-100 text-red-700"
 
   return (
@@ -989,7 +824,6 @@ function SettingsPageContent() {
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [environmentRanges, setEnvironmentRanges] = useState<EnvironmentRangeState>(defaultEnvironmentRanges)
   const [environmentSaving, setEnvironmentSaving] = useState(false)
   const [logs, setLogs] = useState<PolicyLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
@@ -1041,7 +875,7 @@ function SettingsPageContent() {
         id: String(item.id ?? item.plantId ?? Math.random()),
         plantName: item.plantName ?? item.name ?? "未知植物",
         deviceId: String(item.deviceId ?? item.bindDeviceId ?? "—"),
-        online: item.onlineStatus === "ONLINE" || item.online === true,
+        status: item.status ?? "ACTIVE",
       }))
       setPlants(mapped)
       setRemovedPlantIds(new Set()) // reset on reload
@@ -1080,152 +914,9 @@ function SettingsPageContent() {
     }
   }
 
-<<<<<<< HEAD
   useEffect(() => { void loadPlants() }, [])
   useEffect(() => { void loadStrategies() }, [currentPlantApiId])
   useEffect(() => { void loadDevicesStatus() }, [])
-=======
-  const loadStrategyLogs = async (sourceStrategies = strategies) => {
-    if (sourceStrategies.length === 0) {
-      setLogs([])
-      setLogsError(null)
-      return
-    }
-
-    setLogsLoading(true)
-    setLogsError(null)
-    try {
-      const results = await Promise.all(
-        sourceStrategies.map(async (strategy) => {
-          const page = await listStrategyExecutionLogs({
-            strategyId: strategy.id,
-            pageNum: 1,
-            pageSize: 5,
-          })
-          return page.records.map((log) => toPolicyLog(log, strategy))
-        }),
-      )
-      setLogs(
-        results
-          .flat()
-          .sort((a, b) => b.time.localeCompare(a.time))
-          .slice(0, 10),
-      )
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "策略日志加载失败"
-      setLogs([])
-      setLogsError(message)
-    } finally {
-      setLogsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void loadStrategies()
-  }, [currentPlantApiId])
-
-  useEffect(() => {
-    void loadStrategyLogs(strategies)
-  }, [strategies])
-
-  useEffect(() => {
-    setEnvironmentRanges(() => {
-      const next: EnvironmentRangeState = { ...defaultEnvironmentRanges }
-      ;(Object.keys(environmentRangeStrategies) as EnvironmentMetricKey[]).forEach((key) => {
-        const strategy = findEnvironmentRangeStrategy(strategies, key)
-        next[key] =
-          strategy?.thresholdMin != null && strategy.thresholdMax != null
-            ? [Number(strategy.thresholdMin), Number(strategy.thresholdMax)]
-            : defaultEnvironmentRanges[key]
-      })
-      return next
-    })
-  }, [strategies, currentPlantApiId])
-
-  useEffect(() => {
-    void loadDevicesStatus()
-  }, [])
-
-  useEffect(() => {
-    if (!devicesStatus) {
-      return
-    }
-
-    setDevices((currentDevices) =>
-      currentDevices.map((device) => {
-        if (device.id === "d1") {
-          return {
-            ...device,
-            name: devicesStatus.light?.deviceName ?? device.name,
-            topic: devicesStatus.light?.deviceCode ?? device.topic,
-            online: devicesStatus.light?.onlineStatus === "ONLINE",
-          }
-        }
-
-        if (device.id === "d2") {
-          return {
-            ...device,
-            name: devicesStatus.fan?.deviceName ?? device.name,
-            topic: devicesStatus.fan?.deviceCode ?? device.topic,
-            online: devicesStatus.fan?.onlineStatus === "ONLINE",
-          }
-        }
-
-        return device
-      }),
-    )
-  }, [devicesStatus])
-
-  const handleCreateStrategy = async () => {
-    const userSnapshot = readStoredUserSnapshot()
-    const currentUserId = userSnapshot.resolvedUserId
-    setStrategySubmitError(null)
-    const validationMessage = validateStrategyForm(strategyForm, devicesStatus, currentUserId)
-    if (validationMessage) {
-      toast({
-        title: "表单校验失败",
-        description: validationMessage,
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const payload = buildCreatePayload(strategyForm, currentPlantApiId, currentUserId, devicesStatus)
-      logStrategyPayload("create:before-request", payload, {
-        "localStorage.plantcloud_user": userSnapshot.rawUser,
-        parsedUser: userSnapshot.parsedUser,
-        tokenUserId: userSnapshot.tokenUserId,
-        resolvedUserId: userSnapshot.resolvedUserId,
-        "typeof resolvedUserId": typeof userSnapshot.resolvedUserId,
-      })
-      if (payload.actionType === "NOTIFY_USER" && potentialNotifyConflict) {
-        toast({
-          title: "通知策略可能冲突",
-          description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，最终以后端校验结果为准。",
-          variant: "destructive",
-        })
-      }
-      await createStrategy(payload)
-      toast({
-        title: "策略已创建",
-        description: "新策略已经同步到后端。",
-      })
-      setStrategyDialogOpen(false)
-      setStrategyForm(initialFormState)
-      await loadStrategies()
-    } catch (error) {
-      toast({
-        title: "创建策略失败",
-        description: error instanceof Error ? error.message : "请稍后重试",
-        variant: "destructive",
-      })
-    } finally {
-      setSubmitting(false)
-    }
-  }
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
 
   const handleToggleStrategy = async (strategy: StrategyItem, nextEnabled: boolean) => {
     setTogglingId(strategy.id)
@@ -1257,102 +948,6 @@ function SettingsPageContent() {
     }
   }
 
-<<<<<<< HEAD
-=======
-  const handleSaveEnvironmentRanges = async () => {
-    const currentUserId = getCurrentUserId()
-    if (!currentUserId) {
-      toast({
-        title: "无法保存环境阈值",
-        description: "当前登录信息缺少 userId，请重新登录后再试。",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setEnvironmentSaving(true)
-    try {
-      for (const key of Object.keys(environmentRangeStrategies) as EnvironmentMetricKey[]) {
-        const existing = findEnvironmentRangeStrategy(strategies, key)
-        const payload = buildEnvironmentRangePayload(
-          key,
-          environmentRanges[key],
-          currentPlantApiId,
-          currentUserId,
-          existing,
-        )
-        if (existing) {
-          await updateStrategy(existing.id, payload)
-        } else {
-          await createStrategy(payload)
-        }
-      }
-      await loadStrategies()
-      toast({
-        title: "环境阈值已保存",
-        description: `${currentPlant?.name ?? "当前植物"} 的范围已同步到策略表。`,
-      })
-    } catch (error) {
-      toast({
-        title: "环境阈值保存失败",
-        description: error instanceof Error ? error.message : "请稍后重试。",
-        variant: "destructive",
-      })
-    } finally {
-      setEnvironmentSaving(false)
-    }
-  }
-
-  const handleCreateStrategyEnhanced = async () => {
-    const currentUserId = getCurrentUserId()
-    setStrategySubmitError(null)
-
-    const validationMessage = validateStrategyForm(strategyForm, devicesStatus, currentUserId)
-    if (validationMessage) {
-      setStrategySubmitError(validationMessage)
-      toast({
-        title: "表单校验失败",
-        description: validationMessage,
-        variant: "destructive",
-      })
-      return
-    }
-
-    const payload = buildCreatePayload(strategyForm, currentPlantApiId, currentUserId, devicesStatus)
-
-    if (payload.actionType === "NOTIFY_USER" && potentialNotifyConflict) {
-      toast({
-        title: "通知策略可能冲突",
-        description: notifyConflictHint ?? "当前已存在启用中的同类通知策略，最终以后端校验结果为准。",
-        variant: "destructive",
-      })
-    }
-
-    setSubmitting(true)
-    try {
-      await createStrategy(payload)
-      setStrategySubmitError(null)
-      setStrategyDialogOpen(false)
-      setStrategyForm(initialFormState)
-      await loadStrategies()
-      toast({
-        title: "策略保存成功",
-        description: "新策略已创建，并已刷新当前列表。",
-      })
-    } catch (error) {
-      const feedback = buildStrategySaveFeedback(error, payload, potentialNotifyConflict)
-      setStrategySubmitError(feedback.description)
-      toast({
-        title: feedback.title,
-        description: feedback.description,
-        variant: "destructive",
-      })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
   const handleCreateStrategyFriendly = async () => {
     const currentUserId = getCurrentUserId()
     setStrategySubmitError(null)
@@ -1373,14 +968,7 @@ function SettingsPageContent() {
       setStrategyDialogOpen(false)
       setStrategyForm(initialFormState)
       await loadStrategies()
-<<<<<<< HEAD
       toast({ title: "策略保存成功", description: "策略已保存并刷新列表。" })
-=======
-      toast({
-        title: "策略保存成功",
-        description: "策略已保存，并刷新列表。",
-      })
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
     } catch (error) {
       const feedback = buildFriendlyStrategySaveFeedback(error, payload, potentialNotifyConflict)
       setStrategySubmitError(feedback.description)
@@ -1423,8 +1011,24 @@ function SettingsPageContent() {
                         <p className="text-xs text-muted-foreground">绑定设备 ID：{plant.deviceId}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={plant.online ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
-                          {plant.online ? "在线" : "离线"}
+                        <Badge
+                          className={
+                            plant.status === "ACTIVE"
+                              ? "bg-green-100 text-green-700"
+                              : plant.status === "INACTIVE"
+                                ? "bg-gray-100 text-gray-500"
+                                : plant.status === "DELETED"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-500"
+                          }
+                        >
+                          {plant.status === "ACTIVE"
+                            ? "在线"
+                            : plant.status === "INACTIVE"
+                              ? "离线"
+                              : plant.status === "DELETED"
+                                ? "已删除"
+                                : "未知"}
                         </Badge>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <Pencil className="h-4 w-4" />
@@ -1547,7 +1151,7 @@ function SettingsPageContent() {
                     </CardTitle>
                     <CardDescription>显示当前植物策略被实时环境数据触发后的执行记录。</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => void loadStrategyLogs()} disabled={logsLoading}>
+                  <Button variant="outline" size="sm" onClick={() => void loadStrategies()} disabled={logsLoading}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${logsLoading ? "animate-spin" : ""}`} />
                     刷新
                   </Button>
@@ -1595,99 +1199,7 @@ function SettingsPageContent() {
 
             <Separator />
 
-<<<<<<< HEAD
             {/* ── 通知设置 ── */}
-=======
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Thermometer className="h-5 w-5 text-primary" />
-                  环境阈值设置
-                </CardTitle>
-                <CardDescription>保留原页面的其他设置区域，不参与本次策略联调。</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Thermometer className="h-4 w-4 text-orange-500" />
-                      <span className="font-medium">温度范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {environmentRanges.temperature[0]}°C - {environmentRanges.temperature[1]}°C
-                    </span>
-                  </div>
-                  <Slider
-                    value={environmentRanges.temperature}
-                    min={0}
-                    max={50}
-                    step={1}
-                    onValueChange={(value) =>
-                      setEnvironmentRanges((current) => ({ ...current, temperature: [value[0], value[1]] }))
-                    }
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Droplets className="h-4 w-4 text-blue-500" />
-                      <span className="font-medium">湿度范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {environmentRanges.humidity[0]}% - {environmentRanges.humidity[1]}%
-                    </span>
-                  </div>
-                  <Slider
-                    value={environmentRanges.humidity}
-                    min={0}
-                    max={100}
-                    step={1}
-                    onValueChange={(value) =>
-                      setEnvironmentRanges((current) => ({ ...current, humidity: [value[0], value[1]] }))
-                    }
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4 text-amber-500" />
-                      <span className="font-medium">光照范围</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {environmentRanges.light[0].toLocaleString()} - {environmentRanges.light[1].toLocaleString()} lux
-                    </span>
-                  </div>
-                  <Slider
-                    value={environmentRanges.light}
-                    min={0}
-                    max={50000}
-                    step={100}
-                    onValueChange={(value) =>
-                      setEnvironmentRanges((current) => ({ ...current, light: [value[0], value[1]] }))
-                    }
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    disabled={environmentSaving}
-                    onClick={() => void handleSaveEnvironmentRanges()}
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {environmentSaving ? "保存中..." : "保存环境阈值"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
->>>>>>> e298d8d3fe8a3baf1470b2e33ad96cbcf9becdde
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1739,7 +1251,7 @@ function SettingsPageContent() {
               </CardContent>
             </Card>
 
-            <Button
+            {/* <Button
               className="w-full"
               size="lg"
               disabled={environmentSaving}
@@ -1747,7 +1259,7 @@ function SettingsPageContent() {
             >
               <Save className="mr-2 h-4 w-4" />
               {environmentSaving ? "保存中..." : "保存设置"}
-            </Button>
+            </Button> */}
           </div>
         </main>
 
