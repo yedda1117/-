@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { AuthGuard } from "@/components/auth-guard"
-import { NavHeader } from "@/components/nav-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -517,7 +516,7 @@ function StrategyDialog({
   )
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const searchParams = useSearchParams()
   const [devices, setDevices] = useState<DeviceCard[]>(initialDevices)
   const [selectedPlantId, setSelectedPlantId] = useState(DEFAULT_PLANT_ID)
@@ -837,26 +836,6 @@ export default function SettingsPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
-        <NavHeader
-          rightSlot={
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">当前植物</span>
-              <Select value={selectedPlantId} onValueChange={setSelectedPlantId}>
-                <SelectTrigger className="h-8 w-36 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {plantOptions.map((plant) => (
-                    <SelectItem key={plant.id} value={plant.id}>
-                      {plant.emoji} {plant.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          }
-        />
 
         <main className="container mx-auto max-w-4xl px-6 py-8">
           <h1 className="mb-6 text-2xl font-bold">系统设置</h1>
@@ -1161,5 +1140,13 @@ export default function SettingsPage() {
         />
       </div>
     </AuthGuard>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageContent />
+    </Suspense>
   )
 }

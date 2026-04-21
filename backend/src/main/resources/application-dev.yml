@@ -23,7 +23,7 @@ app:
     access-token-expire-seconds: 7200
     refresh-token-expire-seconds: 604800
   mqtt:
-    broker-url: tcp://localhost:1883
+    broker-url: tcp://150.158.76.53:1883
     client-id: plantcloud-backend
     username: guest
     password: guest
@@ -50,3 +50,8 @@ app:
       similarity-threshold: 0.85
       sqlite-db-path: data/face.db
       similarity-type: IP
+
+deepseek:
+  api-key: sk-9460599ee06142d5ab80d71f56575b20
+  base-url: https://api.deepseek.com
+  model: deepseek-chat

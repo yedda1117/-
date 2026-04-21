@@ -2,21 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react"
 import { AuthGuard } from "@/components/auth-guard"
-
-import { NavHeader } from "@/components/nav-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
 import {
   getCalendarDayDetail,
@@ -27,6 +17,7 @@ import {
   ApiError,
   type CalendarDayDetail,
 } from "@/lib/calendar-api"
+import { usePlantSelection } from "@/context/plant-selection"
 import {
   ChevronLeft,
   ChevronRight,
@@ -42,7 +33,6 @@ import {
   Trash2,
   ImageIcon,
   Plus,
-  Leaf,
 } from "lucide-react"
 
 const milestones = [
@@ -52,25 +42,8 @@ const milestones = [
   { id: "repot", apiValue: "REPOT", label: "换盆", icon: FlowerIcon, color: "text-amber-600" },
 ]
 
-const plants = [
-  { id: "p1", name: "薄荷", emoji: "🌿" },
-  { id: "p2", name: "多肉植物", emoji: "🌵" },
-  { id: "p3", name: "小雏菊", emoji: "🌼" },
-  { id: "p4", name: "向日葵", emoji: "🌻" },
-  { id: "p5", name: "绿萝", emoji: "🍀" },
-  { id: "p6", name: "仙人掌", emoji: "🌵" },
-]
-
 const weekDays = ["日", "一", "二", "三", "四", "五", "六"]
 const ROWS = 6
-const plantApiIds: Record<string, number> = {
-  p1: 1,
-  p2: 2,
-  p3: 3,
-  p4: 4,
-  p5: 5,
-  p6: 6,
-}
 
 type DayRecord = {
   hasPhoto: boolean
@@ -129,21 +102,20 @@ function detailToDayRecord(detail: CalendarDayDetail | null): DayRecord {
 }
 
 export default function CalendarPage() {
+  const { currentPlant } = usePlantSelection()
+  const currentPlantApiId = currentPlant.plantId
+
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedMilestones, setSelectedMilestones] = useState<string[]>([])
   const [noteText, setNoteText] = useState("")
-  const [selectedPlantId, setSelectedPlantId] = useState("p1")
   const [calendarData, setCalendarData] = useState<Record<number, DayRecord>>({})
   const [selectedDayDetail, setSelectedDayDetail] = useState<CalendarDayDetail | null>(null)
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [photoProcessMessage, setPhotoProcessMessage] = useState("")
-
-  const currentPlant = plants.find((p) => p.id === selectedPlantId) ?? plants[0]
-  const currentPlantApiId = plantApiIds[selectedPlantId] ?? plantApiIds.p1
 
   const gridRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -365,26 +337,6 @@ export default function CalendarPage() {
   return (
     <AuthGuard>
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <NavHeader
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <Leaf className="h-4 w-4 text-primary" />
-            <span className="text-sm text-muted-foreground">当前植物</span>
-            <Select value={selectedPlantId} onValueChange={setSelectedPlantId}>
-              <SelectTrigger className="w-36 h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {plants.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.emoji} {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        }
-      />
 
       <main className="flex-1 flex flex-col container mx-auto px-6 py-4 overflow-hidden min-h-0">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">

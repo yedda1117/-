@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,15 +36,8 @@ public class DeviceController {
     }
 
     @Operation(summary = "设备绑定植物")
-    @PostMapping("/{deviceId}/bind-plant")
-    public Result<DeviceBindResponseVO> bindPlant(@PathVariable Long deviceId,
-                                                  @Valid @RequestBody DeviceBindPlantRequest request) {
-        return Result.ok(deviceBindingService.bindPlant(deviceId, request));
-    }
-
-    @Operation(summary = "设备解绑植物")
-    @PostMapping("/{deviceId}/unbind-plant")
-    public Result<DeviceBindResponseVO> unbindPlant(@PathVariable Long deviceId) {
-        return Result.ok(deviceBindingService.unbindPlant(deviceId));
+    @PostMapping("/bind-plant")
+    public Result<DeviceBindResponseVO> bindPlant(@Valid @RequestBody DeviceBindPlantRequest request) {
+        return Result.ok(deviceBindingService.bindPlant(request));
     }
 }
