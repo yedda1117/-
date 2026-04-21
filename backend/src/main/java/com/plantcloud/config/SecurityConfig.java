@@ -45,12 +45,20 @@ public class SecurityConfig {
                                 "/strategies/**",
                                 "/alerts/**",
                                 "/calendar/**",
+<<<<<<< HEAD
                                 "/plants/**",
+=======
+                                "/plant-config/**",
+                                "/plants/**",
+                                "/monitoring/**",
+                                "/visualization/**",
+>>>>>>> 19637d2b6e416d3ed40f8fcbfeb0072006eed174
                                 "/devices/**",
                                 "/control/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
