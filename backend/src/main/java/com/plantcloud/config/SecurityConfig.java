@@ -48,11 +48,15 @@ public class SecurityConfig {
                                 "/plant-config/**",
                                 "/plant/**",
                                 "/plants/**",
+                                "/monitoring/**",
+                                "/visualization/**",
+                                "/gps/**",
                                 "/devices/**",
                                 "/control/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 

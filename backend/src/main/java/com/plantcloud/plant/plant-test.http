@@ -223,3 +223,32 @@ Content-Type: {{contentType}}
     "summary": "这是一个用于测试空plantName的请求。"
   }
 }
+
+## GET
+
+GET {{baseUrl}}/plants
+Accept: {{contentType}}
+
+#下列为plant-config的测试代码
+
+### 1. 获取所有植物模板公开字段列表 - 正常测试
+# 预期结果：返回 code 为 0，data 为包含多个植物模板（如蝴蝶兰等）的数组
+GET {{baseUrl}}/plant-config/templates
+Accept: {{contentType}}
+
+###
+
+### 1. 获取所有植物模板公开字段列表 - 正常测试
+# 预期结果：返回 code 为 0，data 为包含多个植物模板（如蝴蝶兰等）的数组
+GET {{baseUrl}}/plants
+Accept: {{contentType}}
+
+###
+
+
+### 5. 异常测试 - 错误的请求方法
+# 该接口只支持 GET，使用 POST 应该返回 405 Method Not Allowed
+POST {{baseUrl}}/plant-config/templates
+Content-Type: {{contentType}}
+
+{}

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 // 这里的基准地址可以根据开发环境切换
 const BACKEND_BASE_URL = "http://localhost:8080"
 
+
+
 export async function GET(req: NextRequest) {
   try {
     const headers: HeadersInit = {
@@ -46,6 +48,46 @@ export async function GET(req: NextRequest) {
         data: [],
       },
       { status: 500 }
+    )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      accept: "application/json",
+    }
+
+    const authorization = req.headers.get("authorization")
+    if (authorization) {
+      headers.Authorization = authorization
+    }
+
+    const body = await req.text() 
+
+    const backendResponse = await fetch(`${BACKEND_BASE_URL}/plants`, {
+      method: "POST",
+      headers,
+      body: body, // 直接透传，不要再在 route.ts 里二次构造转换
+    })
+
+    console.log("正在转发请求到后端:", `${BACKEND_BASE_URL}/plants`);
+    console.log("请求体内容:", body);
+
+    const responseText = await backendResponse.text()
+    let data: unknown = null
+    try {
+      data = responseText ? JSON.parse(responseText) : null
+    } catch {
+      data = { code: backendResponse.status, message: "解析后端返回数据失败" }
+    }
+
+    return NextResponse.json(data, { status: backendResponse.status })
+  } catch (error) {
+    return NextResponse.json(
+      { code: 500, message: error instanceof Error ? error.message : "Internal Error" },
+      { status: 500 },
     )
   }
 }

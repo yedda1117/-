@@ -21,7 +21,7 @@ import {
 import { usePlantSelection } from "@/context/plant-selection"
 
 // 需要显示植物选择器的路由前缀
-const PLANT_SELECTOR_PATHS = ["/home", "/calendar", "/chat"]
+const PLANT_SELECTOR_PATHS = ["/home", "/calendar", "/chat","/settings"]
 
 // 不显示导航栏的路由（登录/注册页）
 const HIDDEN_NAV_PATHS = ["/login", "/register", "/"]
@@ -99,67 +99,3 @@ export function GlobalNavbar() {
     />
   )
 }
-
-// "use client"
-
-// /**
-//  * GlobalNavbar
-//  * 全局导航栏，包含植物选择下拉框。
-//  * 仅在需要显示的页面（/home、/calendar、/chat）渲染植物选择器，
-//  * 其他页面（/login、/register、/dashboard 等）不显示选择器。
-//  */
-
-// import { usePathname } from "next/navigation"
-// import { Leaf } from "lucide-react"
-// import { NavHeader } from "@/components/nav-header"
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select"
-// import { usePlantSelection } from "@/context/plant-selection"
-
-// // 需要显示植物选择器的路由前缀
-// const PLANT_SELECTOR_PATHS = ["/home", "/calendar", "/chat"]
-
-// // 不显示导航栏的路由（登录/注册页）
-// const HIDDEN_NAV_PATHS = ["/login", "/register", "/"]
-
-// export function GlobalNavbar() {
-//   const pathname = usePathname()
-//   const { selectedPlantId, setSelectedPlantId, plants } = usePlantSelection()
-
-//   // 登录/注册页不渲染导航栏
-//   if (HIDDEN_NAV_PATHS.includes(pathname)) {
-//     return null
-//   }
-
-//   const showPlantSelector = PLANT_SELECTOR_PATHS.some((p) => pathname.startsWith(p))
-
-//   return (
-//     <NavHeader
-//       rightSlot={
-//         showPlantSelector ? (
-//           <div className="flex items-center gap-2">
-//             <Leaf className="h-4 w-4 text-primary" />
-//             <span className="text-sm text-muted-foreground">当前植物：</span>
-//             <Select value={selectedPlantId} onValueChange={setSelectedPlantId}>
-//               <SelectTrigger className="w-40 h-8 text-sm">
-//                 <SelectValue />
-//               </SelectTrigger>
-//               <SelectContent>
-//                 {plants.map((p) => (
-//                   <SelectItem key={p.id} value={p.id}>
-//                     {p.emoji} {p.name}
-//                   </SelectItem>
-//                 ))}
-//               </SelectContent>
-//             </Select>
-//           </div>
-//         ) : undefined
-//       }
-//     />
-//   )
-// }

@@ -4,15 +4,16 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
-public class PlantTemplateDataDTO {
+public class PlantTemplateCreateRequest {
 
+    @NotBlank(message = "plantName is required")
     private String plantName;
+
     private String species;
 
     @NotNull(message = "tempMin is required")
@@ -59,10 +60,4 @@ public class PlantTemplateDataDTO {
     @DecimalMin(value = "0", message = "lightRiseSensitive must be greater than or equal to 0")
     @DecimalMax(value = "1", message = "lightRiseSensitive must be less than or equal to 1")
     private BigDecimal lightRiseSensitive;
-
-    @NotBlank(message = "careLevel is required")
-    private String careLevel;
-
-    @Size(max = 200, message = "summary must not exceed 200 characters")
-    private String summary;
 }

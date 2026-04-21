@@ -7,7 +7,8 @@
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/fronted",
-      "preLaunchTask": "fronted: dev"
+      "preLaunchTask": "fronted: dev",
+      "runtimeExecutable":"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     }
   ]
 }
