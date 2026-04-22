@@ -399,7 +399,7 @@ export default function HomePage() {
 
   return (
     <AuthGuard>
-      <div className="h-screen overflow-hidden bg-[#ede4d4] text-stone-900">
+      <div className="h-screen overflow-hidden bg-[#d0e8de] text-stone-900">
         <div className="h-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.48),_transparent_38%),linear-gradient(135deg,_rgba(255,248,236,0.96),_rgba(236,226,209,0.98))]">
           <main className="mx-auto flex h-full max-w-[1600px] items-center overflow-hidden px-6 py-[4vh] xl:px-10">
             <div className="grid h-full max-h-[92vh] w-full grid-cols-1 items-center gap-8 overflow-hidden xl:grid-cols-[320px_minmax(560px,1fr)_360px] xl:gap-10 2xl:grid-cols-[360px_minmax(680px,1fr)_400px]">
@@ -491,7 +491,7 @@ export default function HomePage() {
                           background: `conic-gradient(#8f4b3b 0deg ${unresolvedRatio * 360}deg, rgba(120,104,74,0.14) ${unresolvedRatio * 360}deg 360deg)`,
                         }}
                       >
-                        <div className="absolute inset-[18px] rounded-full bg-[#ede4d4]" />
+                        <div className="absolute inset-[18px] rounded-full bg-[#d0e8de]" />
                         <div className="absolute inset-0 flex items-center justify-center text-xs uppercase tracking-[0.22em] text-stone-500">
                           {Math.round(unresolvedRatio * 100)}%
                         </div>
