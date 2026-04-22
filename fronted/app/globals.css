@@ -296,6 +296,22 @@
   background: linear-gradient(180deg, rgba(190, 242, 100, 0.9), rgba(45, 212, 191, 0.68));
 }
 
+@keyframes plant-float {
+  0%, 100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 18px 22px rgba(6, 95, 70, 0.08));
+  }
+  50% {
+    transform: translateY(-7px);
+    filter: drop-shadow(0 24px 28px rgba(6, 95, 70, 0.12));
+  }
+}
+
+.plant-float {
+  animation: plant-float 3.8s ease-in-out infinite;
+  will-change: transform, filter;
+}
+
 @keyframes plant-water-rise {
   0% {
     transform: translateY(102%);
