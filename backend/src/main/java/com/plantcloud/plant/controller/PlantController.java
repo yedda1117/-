@@ -6,6 +6,7 @@ import com.plantcloud.plant.service.PlantService;
 import com.plantcloud.plant.vo.PlantCreateVO;
 import com.plantcloud.plant.vo.PlantSimpleVO;
 import com.plantcloud.plant.vo.RiskAnalysisResultVO;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -28,6 +29,10 @@ public class PlantController {
 
     private final PlantService plantService;
 
+    @Operation(
+            summary = "获取用户植物列表（简要信息）",
+            description = "获取当前用户所有植物的基础信息，返回植物 ID、植物名称和 plants 表中的 status。"
+    )
     @GetMapping
     public Result<List<PlantSimpleVO>> listPlants() {
         List<PlantSimpleVO> data = plantService.listSimplePlants(DEFAULT_OWNER_ID);

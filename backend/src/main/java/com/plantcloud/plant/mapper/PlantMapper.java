@@ -17,7 +17,7 @@ public interface PlantMapper extends BaseMapper<Plant> {
                    plant_name AS plantName,
                    status
             FROM plants
-            WHERE status = 'ACTIVE' AND owner_id = #{ownerId}
+            WHERE owner_id = #{ownerId}
             ORDER BY id ASC
             """)
     List<PlantSimpleVO> selectSimplePlants(@Param("ownerId") Long ownerId);
