@@ -71,7 +71,7 @@ export function GlobalNavbar() {
       {/* 跟随鼠标的 tooltip */}
       {tooltip && (
         <div
-          className="fixed z-[9999] pointer-events-none rounded-lg bg-black/10 px-2.5 py-1 text-xs font-medium text-green-900 backdrop-blur-sm"
+          className="fixed z-[9999] pointer-events-none rounded-lg bg-[#064e3b] px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm"
           style={{ left: tooltip.x + 14, top: tooltip.y - 10 }}
         >
           {tooltip.label}
