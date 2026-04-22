@@ -257,7 +257,7 @@ function normalizeStatus(status: string | null | undefined) {
 
 function PlantKnowledgeFigure() {
   return (
-    <div className="relative mx-auto h-40 w-64" aria-hidden="true">
+    <div className="plant-float relative mx-auto h-40 w-64" aria-hidden="true">
       <div className="absolute left-1/2 top-8 h-28 w-44 -translate-x-1/2 rounded-full bg-emerald-100/70 blur-3xl" />
 
       <div className="absolute left-1/2 top-3 h-28 w-36 -translate-x-1/2 rounded-t-[4rem] rounded-b-[1.8rem] border border-white/95 bg-gradient-to-b from-white/62 via-cyan-50/28 to-white/14 shadow-[inset_0_1px_14px_rgba(255,255,255,0.88),0_24px_42px_rgba(6,95,70,0.14)] backdrop-blur-xl" />
