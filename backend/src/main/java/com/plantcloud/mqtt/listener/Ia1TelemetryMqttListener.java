@@ -205,6 +205,8 @@ public class Ia1TelemetryMqttListener {
         statusNode.put("mqttStatus", "ONLINE");
         statusNode.put("online", true);
         statusNode.put("telemetryUpdatedAt", now.toString());
+        statusNode.put("statusUpdatedAt", now.toString());
+        statusNode.put("stateSource", "TELEMETRY");
 
         device.setCurrentStatus(statusNode.toString());
         device.setOnlineStatus("ONLINE");

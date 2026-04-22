@@ -1,6 +1,8 @@
 package com.plantcloud.control.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.plantcloud.control.dto.DeviceControlRequest;
 import com.plantcloud.control.entity.DeviceCommandLog;
 import com.plantcloud.control.enums.CommandStatus;
@@ -19,15 +21,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeviceCommandServiceImpl implements DeviceCommandService {
+
+    private static final String DEVICE_TYPE_IA1 = "IA1";
+    private static final String DEVICE_CODE_E53IA1 = "E53IA1";
 
     private final DeviceMapper deviceMapper;
     private final DeviceCommandLogMapper logMapper;
@@ -51,6 +57,8 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
      * 不加 @Transactional，避免内部调用导致事务失效
      */
     private ControlCommandVO execute(DeviceControlRequest request, ControlTarget target) {
+        log.info("[CTRL] service start plantId={} deviceId={} target={} commandValue={}",
+                request.getPlantId(), request.getDeviceId(), target, request.getCommandValue());
         log.info("开始执行控制命令. plantId={}, deviceId={}, target={}, command={}",
                 request.getPlantId(), request.getDeviceId(), target, request.getCommandValue());
 
@@ -58,6 +66,9 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         if (device == null) {
             throw new DeviceNotFoundException("Device not found: " + request.getDeviceId());
         }
+        log.info("[CTRL] device resolved id={} code={} type={} onlineStatus={} mqttTopicDown={}",
+                device.getId(), device.getDeviceCode(), device.getDeviceType(),
+                device.getOnlineStatus(), device.getMqttTopicDown());
 
         validateTargetDeviceType(target, device);
 
@@ -73,7 +84,11 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
         try {
             String topic = buildTopic(device);
+            log.info("[CTRL] resolved topic={}", topic);
+            log.info("[CTRL] resolved payload={}", payload);
             PublishResult result = mqttService.publish(topic, payload);
+            log.info("[CTRL] mqtt publish returned success={} errorMessage={}",
+                    result.isSuccess(), result.getErrorMessage());
 
             if (!result.isSuccess()) {
                 throw new MqttPublishException(
@@ -86,12 +101,15 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
             commandLog.setExecuteStatus(CommandStatus.SUCCESS.name());
             commandLog.setExecutedAt(LocalDateTime.now());
             logMapper.updateById(commandLog);
-
+            updateDeviceCommandStatus(device, target, action);
+            log.info("[CTRL] command success logId={} topic={} payload={}", commandLog.getId(), topic, payload);
             log.info("控制命令执行成功. logId={}, topic={}", commandLog.getId(), topic);
 
             return buildVO(commandLog, "控制指令下发成功");
 
         } catch (Exception e) {
+            log.error("[CTRL] command failed logId={} deviceId={} target={} commandValue={}",
+                    commandLog.getId(), request.getDeviceId(), target, request.getCommandValue(), e);
             commandLog.setExecuteStatus(CommandStatus.FAILED.name());
             commandLog.setErrorMessage(e.getMessage());
             commandLog.setExecutedAt(LocalDateTime.now());
@@ -105,6 +123,9 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
     private void validateTargetDeviceType(ControlTarget target, Device device) {
         String deviceType = device.getDeviceType();
+        if (isIa1Device(device)) {
+            return;
+        }
         if (target == ControlTarget.LIGHT && !"FILL_LIGHT".equalsIgnoreCase(deviceType)) {
             throw new InvalidCommandException("Device type mismatch: LIGHT control requires device type FILL_LIGHT");
         }
@@ -132,7 +153,7 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
     private String buildPayload(ControlTarget target, String action) {
         try {
-            Map<String, String> map = new HashMap<>();
+            Map<String, String> map = new LinkedHashMap<>();
             map.put("target", target.getValue());
             map.put("action", action);
             return objectMapper.writeValueAsString(map);
@@ -146,11 +167,58 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
             throw new RuntimeException("Device ID is null");
         }
 
+        if (isIa1Device(device) && StringUtils.hasText(device.getDeviceCode())) {
+            return "device/" + device.getDeviceCode() + "/ia1/control";
+        }
+
         if (device.getMqttTopicDown() != null && !device.getMqttTopicDown().isBlank()) {
             return device.getMqttTopicDown();
         }
 
         return "device/" + device.getId() + "/ia1/control";
+    }
+
+    private boolean isIa1Device(Device device) {
+        return DEVICE_TYPE_IA1.equalsIgnoreCase(device.getDeviceType())
+                || DEVICE_CODE_E53IA1.equalsIgnoreCase(device.getDeviceCode());
+    }
+
+    private void updateDeviceCommandStatus(Device device, ControlTarget target, String action) {
+        ObjectNode statusNode = buildCurrentStatusNode(device.getCurrentStatus());
+        LocalDateTime now = LocalDateTime.now();
+
+        if (target == ControlTarget.FAN) {
+            statusNode.put("fanStatus", action);
+        } else if (target == ControlTarget.LIGHT) {
+            statusNode.put("lightStatus", action);
+        }
+
+        statusNode.put("mqttStatus", device.getOnlineStatus());
+        statusNode.put("online", isDeviceOnline(device));
+        statusNode.put("commandUpdatedAt", now.toString());
+        statusNode.put("statusUpdatedAt", now.toString());
+        statusNode.put("stateSource", "COMMAND");
+
+        device.setCurrentStatus(statusNode.toString());
+        device.setUpdatedAt(now);
+        deviceMapper.updateById(device);
+
+        log.info("[CTRL] current_status updated by command. deviceId={}, target={}, action={}, currentStatus={}",
+                device.getId(), target, action, device.getCurrentStatus());
+    }
+
+    private ObjectNode buildCurrentStatusNode(String currentStatus) {
+        try {
+            if (StringUtils.hasText(currentStatus)) {
+                JsonNode node = objectMapper.readTree(currentStatus);
+                if (node.isObject()) {
+                    return (ObjectNode) node;
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("[CTRL] invalid current_status JSON, will rebuild. currentStatus={}", currentStatus);
+        }
+        return objectMapper.createObjectNode();
     }
 
     private DeviceCommandLog buildPendingLog(DeviceControlRequest req, String action, String payload) {

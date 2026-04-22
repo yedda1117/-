@@ -4,21 +4,29 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { MapPin, Leaf } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
+import { usePlantSelection } from "@/context/plant-selection"
 
-// ─── Mock 数据（后端接口完成后替换） ────────────────────────────────────────────
-const mockGpsData = {
-  plantName: "绿萝",
-  address: "重庆市两江新区总部基地B1",
-  lat: 29.631,  // 纬度（重庆两江新区）
-  lng: 106.551, // 经度
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:8080"
+
+type ApiResult<T> = {
+  code?: number
+  message?: string
+  data?: T
 }
 
-// ─── 数据类型 ────────────────────────────────────────────────────────────────
-interface GpsData {
-  plantName: string
-  address: string
-  lat: number
-  lng: number
+type GpsLocation = {
+  id: number | string
+  plantId: number | string
+  deviceId: number | string | null
+  longitude: number | string | null
+  latitude: number | string | null
+  createdAt: string | null
+}
+
+type GpsState = {
+  latest: GpsLocation | null
+  loading: boolean
+  error: boolean
 }
 
 // ─── 懒加载地图（避免 SSR 报错） ─────────────────────────────────────────────
@@ -31,38 +39,120 @@ const GpsMap = dynamic(() => import("@/components/gps-map"), {
   ),
 })
 
+function toNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatCoordinate(value: number | string | null | undefined) {
+  const parsed = toNumber(value)
+  return parsed === null ? "--" : parsed.toFixed(6)
+}
+
+function formatLocationTime(value: string | null | undefined) {
+  if (!value) return "--"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "--"
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
+function getLatestLocation(locations: GpsLocation[]) {
+  if (!locations.length) return null
+  return [...locations].sort((a, b) => {
+    const left = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const right = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return right - left
+  })[0] ?? null
+}
+
+async function fetchGpsLocations(plantId: number, token: string) {
+  const headers: HeadersInit = {}
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${BACKEND_BASE_URL}/gps/locations?plantId=${encodeURIComponent(String(plantId))}`, {
+    cache: "no-store",
+    headers,
+  })
+
+  let payload: ApiResult<GpsLocation[]> | null = null
+  try {
+    payload = (await response.json()) as ApiResult<GpsLocation[]>
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || (payload && typeof payload.code === "number" && payload.code !== 0)) {
+    throw new Error(payload?.message || "定位获取失败")
+  }
+
+  return Array.isArray(payload?.data) ? payload.data : []
+}
+
 // ─── 主组件 ──────────────────────────────────────────────────────────────────
 export function GpsBadge() {
-  const [gpsData, setGpsData] = useState<GpsData>(mockGpsData)
+  const { currentPlant } = usePlantSelection()
+  const [gpsState, setGpsState] = useState<GpsState>({
+    latest: null,
+    loading: true,
+    error: false,
+  })
   const [showPopover, setShowPopover] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   // 用 timer ref 防止鼠标在触发区与 popover 之间短暂离开时闪烁
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const latest = gpsState.latest
+  const latitude = toNumber(latest?.latitude)
+  const longitude = toNumber(latest?.longitude)
+  const hasLocation = latest !== null && latitude !== null && longitude !== null
+  const summaryText = gpsState.error
+    ? "定位获取失败"
+    : gpsState.loading
+      ? "定位加载中"
+      : hasLocation
+        ? `经度 ${formatCoordinate(longitude)}`
+        : "暂无定位数据"
+
   // ── 数据获取逻辑（useEffect） ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
 
-    const fetchGpsData = async () => {
-      // ── 后端接口对接时取消下方注释 ──────────────────────────────────────
-      // try {
-      //   const token = window.localStorage.getItem("plantcloud_token") || ""
-      //   const res = await fetch("http://localhost:8080/api/gps", {
-      //     headers: { Authorization: `Bearer ${token}` },
-      //   })
-      //   if (!res.ok) throw new Error("GPS 接口请求失败")
-      //   const data: GpsData = await res.json()
-      //   if (!cancelled) setGpsData(data)
-      // } catch (err) {
-      //   console.error("GPS 数据获取失败:", err)
-      // }
-      // ── 目前使用 mock 数据 ────────────────────────────────────────────────
-      if (!cancelled) setGpsData(mockGpsData)
+    const loadGpsData = async () => {
+      try {
+        setGpsState((prev) => ({ ...prev, loading: true, error: false }))
+        const token = window.localStorage.getItem("plantcloud_token") || ""
+        const locations = await fetchGpsLocations(currentPlant.plantId, token)
+        if (!cancelled) {
+          setGpsState({
+            latest: getLatestLocation(locations),
+            loading: false,
+            error: false,
+          })
+        }
+      } catch (error) {
+        console.error("定位获取失败:", error)
+        if (!cancelled) {
+          setGpsState({
+            latest: null,
+            loading: false,
+            error: true,
+          })
+        }
+      }
     }
 
-    void fetchGpsData()
+    void loadGpsData()
     return () => { cancelled = true }
-  }, [])
+  }, [currentPlant.plantId])
 
   // ── 点击外部关闭 Popover ──────────────────────────────────────────────────
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -112,10 +202,10 @@ export function GpsBadge() {
         <div className="flex flex-col leading-tight text-left">
           <span className="text-xs font-semibold text-foreground flex items-center gap-1">
             <Leaf className="h-3 w-3 text-primary" />
-            {gpsData.plantName}
+            {currentPlant.name}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            当前位置：{gpsData.address}
+            {summaryText}
           </span>
         </div>
       </button>
@@ -140,14 +230,26 @@ export function GpsBadge() {
               className="absolute -top-[7px] right-6 w-3 h-3 bg-background border-l border-t border-border/60 rotate-45"
             />
 
-            {/* 地址文字 */}
-            <p className="text-xs text-muted-foreground mb-2 px-0.5 flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-primary shrink-0" />
-              {gpsData.address}
-            </p>
+            {gpsState.error ? (
+              <p className="text-sm text-destructive">定位获取失败</p>
+            ) : !hasLocation ? (
+              <p className="text-sm text-muted-foreground">暂无定位数据</p>
+            ) : (
+              <>
+                <div className="mb-3 space-y-1.5 px-0.5 text-xs">
+                  <p className="flex items-center gap-1 font-medium text-foreground">
+                    <MapPin className="h-3 w-3 text-primary shrink-0" />
+                    最新定位
+                  </p>
+                  <p className="text-muted-foreground">经度：{formatCoordinate(longitude)}</p>
+                  <p className="text-muted-foreground">纬度：{formatCoordinate(latitude)}</p>
+                  <p className="text-muted-foreground">更新时间：{formatLocationTime(latest.createdAt)}</p>
+                </div>
 
-            {/* 地图 */}
-            <GpsMap lat={gpsData.lat} lng={gpsData.lng} plantName={gpsData.plantName} />
+                {/* 地图：沿用现有已预留组件 */}
+                <GpsMap lat={latitude} lng={longitude} plantName={currentPlant.name} />
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

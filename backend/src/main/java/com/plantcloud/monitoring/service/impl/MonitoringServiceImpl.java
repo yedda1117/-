@@ -3,7 +3,9 @@ package com.plantcloud.monitoring.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.plantcloud.device.entity.Device;
 import com.plantcloud.device.mapper.DeviceMapper;
 import com.plantcloud.monitoring.entity.HumidityData;
@@ -22,6 +24,7 @@ import com.plantcloud.strategy.mapper.StrategyMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,6 +56,9 @@ public class MonitoringServiceImpl implements MonitoringService {
     private final StrategyMapper strategyMapper;
     private final StrategyExecutionLogMapper strategyExecutionLogMapper;
     private final ObjectMapper objectMapper;
+
+    private record LatestTelemetryPayload(String rawPayload, LocalDateTime collectedAt) {
+    }
 
     @Override
     @Transactional
@@ -108,7 +114,7 @@ public class MonitoringServiceImpl implements MonitoringService {
                         .deviceName(device.getDeviceName())
                         .deviceType(device.getDeviceType())
                         .onlineStatus(device.getOnlineStatus())
-                        .currentStatus(device.getCurrentStatus())
+                        .currentStatus(resolveDeviceCurrentStatus(device))
                         .build())
                 .toList();
 
@@ -116,6 +122,120 @@ public class MonitoringServiceImpl implements MonitoringService {
                 .plantId(plantId)
                 .devices(devices)
                 .build();
+    }
+
+    private String resolveDeviceCurrentStatus(Device device) {
+        LatestTelemetryPayload latestTelemetry = findLatestTelemetryPayload(device.getId());
+        if (latestTelemetry == null || !StringUtils.hasText(latestTelemetry.rawPayload())) {
+            return device.getCurrentStatus();
+        }
+
+        try {
+            JsonNode payloadNode = objectMapper.readTree(latestTelemetry.rawPayload());
+            if (!payloadNode.isObject() || !hasDeviceState(payloadNode)) {
+                return device.getCurrentStatus();
+            }
+
+            ObjectNode statusNode = buildStatusNode(device.getCurrentStatus());
+            boolean telemetryIsFreshForCommand = isTelemetryFreshForCommand(latestTelemetry, statusNode);
+            if (telemetryIsFreshForCommand) {
+                putTextIfPresent(payloadNode, statusNode, "fan_status", "fanStatus");
+                putTextIfPresent(payloadNode, statusNode, "light_status", "lightStatus");
+                statusNode.put("stateSource", "TELEMETRY");
+            }
+            putNodeIfPresent(payloadNode, statusNode, "temperature", "temperature");
+            putNodeIfPresent(payloadNode, statusNode, "humidity", "humidity");
+            putNodeIfPresent(payloadNode, statusNode, "light_intensity", "lightIntensity");
+
+            if (StringUtils.hasText(device.getOnlineStatus())) {
+                statusNode.put("mqttStatus", device.getOnlineStatus());
+                statusNode.put("online", "ONLINE".equalsIgnoreCase(device.getOnlineStatus()));
+            }
+            if (latestTelemetry.collectedAt() != null) {
+                statusNode.put("telemetryUpdatedAt", latestTelemetry.collectedAt().toString());
+                if (telemetryIsFreshForCommand) {
+                    statusNode.put("statusUpdatedAt", latestTelemetry.collectedAt().toString());
+                }
+            }
+
+            return statusNode.toString();
+        } catch (Exception ex) {
+            return device.getCurrentStatus();
+        }
+    }
+
+    private LatestTelemetryPayload findLatestTelemetryPayload(Long deviceId) {
+        if (deviceId == null) {
+            return null;
+        }
+
+        TemperatureData temperatureData = temperatureDataMapper.selectOne(
+                new LambdaQueryWrapper<TemperatureData>()
+                        .eq(TemperatureData::getDeviceId, deviceId)
+                        .isNotNull(TemperatureData::getRawPayload)
+                        .orderByDesc(TemperatureData::getCollectedAt)
+                        .orderByDesc(TemperatureData::getId)
+                        .last("limit 1")
+        );
+        if (temperatureData == null || !StringUtils.hasText(temperatureData.getRawPayload())) {
+            return null;
+        }
+
+        return new LatestTelemetryPayload(temperatureData.getRawPayload(), temperatureData.getCollectedAt());
+    }
+
+    private ObjectNode buildStatusNode(String currentStatus) {
+        if (StringUtils.hasText(currentStatus)) {
+            try {
+                JsonNode node = objectMapper.readTree(currentStatus);
+                if (node.isObject()) {
+                    return (ObjectNode) node;
+                }
+            } catch (JsonProcessingException ignored) {
+                // Keep status response available even if the stored JSON is dirty.
+            }
+        }
+        return objectMapper.createObjectNode();
+    }
+
+    private boolean isTelemetryFreshForCommand(LatestTelemetryPayload latestTelemetry, ObjectNode statusNode) {
+        LocalDateTime commandUpdatedAt = parseStatusTime(statusNode, "commandUpdatedAt");
+        if (commandUpdatedAt == null || latestTelemetry.collectedAt() == null) {
+            return true;
+        }
+        return !latestTelemetry.collectedAt().isBefore(commandUpdatedAt);
+    }
+
+    private LocalDateTime parseStatusTime(ObjectNode statusNode, String fieldName) {
+        JsonNode value = statusNode.get(fieldName);
+        if (value == null || !value.isTextual() || !StringUtils.hasText(value.asText())) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value.asText());
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
+    }
+
+    private boolean hasDeviceState(JsonNode payloadNode) {
+        return payloadNode.hasNonNull("fan_status")
+                || payloadNode.hasNonNull("light_status")
+                || payloadNode.hasNonNull("temperature")
+                || payloadNode.hasNonNull("humidity")
+                || payloadNode.hasNonNull("light_intensity");
+    }
+
+    private void putTextIfPresent(JsonNode source, ObjectNode target, String sourceKey, String targetKey) {
+        if (source.hasNonNull(sourceKey)) {
+            target.put(targetKey, source.get(sourceKey).asText());
+        }
+    }
+
+    private void putNodeIfPresent(JsonNode source, ObjectNode target, String sourceKey, String targetKey) {
+        if (source.hasNonNull(sourceKey)) {
+            target.set(targetKey, source.get(sourceKey));
+        }
     }
 
     private String resolveTemperatureStatus(BigDecimal temperature) {

@@ -7,7 +7,7 @@ import { GpsBadge } from "@/components/gps-badge"
 import { DeviceControl } from "@/components/device-control"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getHomeRealtime, type HomeRealtimeData } from "@/lib/home-api"
+import { controlHomeDevice, getHomeRealtime, type HomeRealtimeData, type HomeControlTarget } from "@/lib/home-api"
 import { usePlantSelection } from "@/context/plant-selection"
 import {
   Thermometer,
@@ -37,6 +37,39 @@ function formatLogTime(value: string | null | undefined) {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
 }
 
+function getConnectionMeta(connected: boolean | null | undefined, statusUpdatedAt: string | null | undefined, onlineStatus: string | null | undefined) {
+  if (connected === true) {
+    return {
+      title: "在线",
+      detail: statusUpdatedAt ? `最近更新 ${formatLogTime(statusUpdatedAt)}` : `状态 ${onlineStatus || "ONLINE"}`,
+      dotClass: "bg-emerald-500",
+      cardClass: "border-emerald-200 bg-emerald-50/70",
+      iconClass: "bg-emerald-100 ring-1 ring-emerald-200/70",
+      badgeClass: "border-emerald-200 bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+    }
+  }
+
+  if (connected === false) {
+    return {
+      title: "离线",
+      detail: statusUpdatedAt ? `最近更新 ${formatLogTime(statusUpdatedAt)}` : `状态 ${onlineStatus || "OFFLINE"}`,
+      dotClass: "bg-red-500",
+      cardClass: "border-red-200 bg-red-50/70",
+      iconClass: "bg-red-100 ring-1 ring-red-200/70",
+      badgeClass: "border-red-200 bg-red-100 text-red-700 hover:bg-red-100",
+    }
+  }
+
+  return {
+    title: "未知",
+    detail: onlineStatus ? `状态 ${onlineStatus}` : "等待设备上报",
+    dotClass: "bg-gray-400",
+    cardClass: "border-border bg-card",
+    iconClass: "bg-muted",
+    badgeClass: "border-border bg-background text-muted-foreground hover:bg-background",
+  }
+}
+
 function getLogText(title: string | null | undefined) {
   return title || "\u544a\u8b66\u65e5\u5fd7"
 }
@@ -49,6 +82,7 @@ function getSeverityMeta(severity: string | null | undefined) {
         cardClass: "border-red-200 bg-red-50/80 hover:bg-red-50",
         iconClass: "bg-red-100 text-red-500",
         titleClass: "text-red-950",
+        timeClass: "text-muted-foreground",
         badgeClass: "bg-red-500 text-white hover:bg-red-500",
       }
     case "HIGH":
@@ -57,6 +91,7 @@ function getSeverityMeta(severity: string | null | undefined) {
         cardClass: "border-red-200 bg-red-50/70 hover:bg-red-50",
         iconClass: "bg-red-100 text-red-500",
         titleClass: "text-red-950",
+        timeClass: "text-muted-foreground",
         badgeClass: "bg-red-100 text-red-700 hover:bg-red-100",
       }
     case "MEDIUM":
@@ -65,6 +100,7 @@ function getSeverityMeta(severity: string | null | undefined) {
         cardClass: "border-amber-200 bg-amber-50/80 hover:bg-amber-50",
         iconClass: "bg-amber-100 text-amber-600",
         titleClass: "text-amber-950",
+        timeClass: "text-muted-foreground",
         badgeClass: "bg-amber-100 text-amber-700 hover:bg-amber-100",
       }
     case "LOW":
@@ -73,6 +109,7 @@ function getSeverityMeta(severity: string | null | undefined) {
         cardClass: "border-sky-200 bg-sky-50/80 hover:bg-sky-50",
         iconClass: "bg-sky-100 text-sky-600",
         titleClass: "text-sky-950",
+        timeClass: "text-muted-foreground",
         badgeClass: "bg-sky-100 text-sky-700 hover:bg-sky-100",
       }
     default:
@@ -81,37 +118,80 @@ function getSeverityMeta(severity: string | null | undefined) {
         cardClass: "border-border bg-muted/50 hover:bg-muted",
         iconClass: "bg-slate-100 text-slate-500",
         titleClass: "text-foreground",
+        timeClass: "text-muted-foreground",
         badgeClass: "bg-slate-100 text-slate-600 hover:bg-slate-100",
       }
+  }
+}
+
+function isResolvedLog(status: string | null | undefined) {
+  return (status || "UNRESOLVED").toUpperCase() === "RESOLVED"
+}
+
+function getLogCreatedTime(value: string | null | undefined) {
+  if (!value) return 0
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function sortActivityLogs(logs: HomeRealtimeData["activityLogs"]) {
+  return [...logs].sort((left, right) => {
+    const leftResolved = isResolvedLog(left.status)
+    const rightResolved = isResolvedLog(right.status)
+
+    if (leftResolved !== rightResolved) {
+      return leftResolved ? 1 : -1
+    }
+
+    return getLogCreatedTime(right.createdAt) - getLogCreatedTime(left.createdAt)
+  })
+}
+
+function getActivityLogMeta(log: HomeRealtimeData["activityLogs"][number]) {
+  if (!isResolvedLog(log.status)) {
+    return getSeverityMeta(log.severity)
+  }
+
+  return {
+    label: "已解决",
+    cardClass: "border-slate-200 bg-slate-50/80 hover:bg-slate-50",
+    iconClass: "bg-slate-100 text-slate-400",
+    titleClass: "text-slate-500",
+    timeClass: "text-slate-400",
+    badgeClass: "bg-slate-100 text-slate-500 hover:bg-slate-100",
   }
 }
 
 export default function HomePage() {
   const { currentPlant } = usePlantSelection()
 
-  const [lightOn, setLightOn] = useState(true)
-  const [fanOn, setFanOn] = useState(true)
   const [plantState, setPlantState] = useState<PlantState>("healthy")
   const [realtimeData, setRealtimeData] = useState<HomeRealtimeData | null>(null)
   const [realtimeError, setRealtimeError] = useState<string | null>(null)
+  const [controlPending, setControlPending] = useState<HomeControlTarget | null>(null)
 
   // currentPlant.plantId 对应后端 plantId
   const plantApiId = currentPlant.plantId
 
-  const previewSensorData = realtimeData
-    ? {
-        temperature: realtimeData.environment.temperature ?? 24,
-        humidity:    realtimeData.environment.humidity    ?? 60,
-        light:       realtimeData.environment.lightLux    ?? 500,
-        hasHuman:    realtimeData.infrared.currentDetected,
-        isFallen:    realtimeData.tilt.hasAlert,
-      }
-    : { temperature: 24, humidity: 60, light: 500, hasHuman: false, isFallen: false }
+  const previewSensorData = {
+    temperature: realtimeData?.environment.temperature ?? null,
+    humidity:    realtimeData?.environment.humidity    ?? null,
+    light:       realtimeData?.environment.lightLux    ?? null,
+    hasHuman:    realtimeData?.infrared.currentDetected ?? false,
+    isFallen:    realtimeData?.tilt.hasAlert ?? false,
+  }
 
   // 切换植物时重置实时数据
   useEffect(() => {
     setRealtimeData(null)
     setRealtimeError(null)
+  }, [plantApiId])
+
+  useEffect(() => {
+    console.info("[CTRL][HOME] home control bundle active", {
+      plantId: plantApiId,
+      marker: "home-control-click-debug-20260422",
+    })
   }, [plantApiId])
 
   // 轮询实时数据
@@ -123,7 +203,18 @@ export default function HomePage() {
       if (!token) return
       try {
         const nextData = await getHomeRealtime(plantApiId, token)
-        if (!cancelled) { setRealtimeData(nextData); setRealtimeError(null) }
+        if (!cancelled) {
+          console.info("[CTRL][HOME] realtime loaded", {
+            plantId: plantApiId,
+            deviceId: nextData.device.deviceId,
+            deviceCode: nextData.device.deviceCode,
+            onlineStatus: nextData.device.onlineStatus,
+            fanStatus: nextData.device.fanStatus,
+            lightStatus: nextData.device.lightStatus,
+          })
+          setRealtimeData(nextData)
+          setRealtimeError(null)
+        }
       } catch (error) {
         if (!cancelled) setRealtimeError(error instanceof Error ? error.message : "实时数据加载失败")
       }
@@ -136,13 +227,13 @@ export default function HomePage() {
 
   // 根据传感器数据推断植物状态
   useEffect(() => {
-    if      (previewSensorData.isFallen)              setPlantState("fallen")
-    else if (previewSensorData.temperature > 30)      setPlantState("hot")
-    else if (previewSensorData.temperature < 15)      setPlantState("cold")
-    else if (previewSensorData.humidity < 40)         setPlantState("thirsty")
-    else if (previewSensorData.light < 200)           setPlantState("dark")
-    else if (previewSensorData.hasHuman)              setPlantState("happy")
-    else                                              setPlantState("healthy")
+    if      (previewSensorData.isFallen)                                            setPlantState("fallen")
+    else if (previewSensorData.temperature !== null && previewSensorData.temperature > 30) setPlantState("hot")
+    else if (previewSensorData.temperature !== null && previewSensorData.temperature < 15) setPlantState("cold")
+    else if (previewSensorData.humidity !== null && previewSensorData.humidity < 40)       setPlantState("thirsty")
+    else if (previewSensorData.light !== null && previewSensorData.light < 200)            setPlantState("dark")
+    else if (previewSensorData.hasHuman)                                            setPlantState("happy")
+    else                                                                            setPlantState("healthy")
   }, [previewSensorData])
 
   const getTempStatus = () => {
@@ -188,7 +279,95 @@ export default function HomePage() {
     ? realtimeData.abnormal.latestTitle || realtimeData.abnormal.latestContent || "检测到异常，请及时处理"
     : "一切正常"
 
-  const activityLogs = realtimeData?.activityLogs ?? []
+  const activityLogs = sortActivityLogs(realtimeData?.activityLogs ?? [])
+  const connectionMeta = getConnectionMeta(
+    realtimeData?.device.connected,
+    realtimeData?.device.statusUpdatedAt,
+    realtimeData?.device.onlineStatus,
+  )
+
+  const lightOn = realtimeData?.device.lightOn ?? null
+  const fanOn = realtimeData?.device.fanOn ?? null
+
+  const refreshRealtimeData = async (token: string) => {
+    const nextData = await getHomeRealtime(plantApiId, token)
+    setRealtimeData(nextData)
+    setRealtimeError(null)
+    return nextData
+  }
+
+  const handleDeviceToggle = async (target: HomeControlTarget, nextValue: boolean) => {
+    const device = realtimeData?.device
+    const deviceId = device?.deviceId
+    console.info("[CTRL][HOME] handleDeviceToggle entered", {
+      target,
+      nextValue,
+      plantId: plantApiId,
+      deviceId,
+      controlPending,
+      deviceCode: device?.deviceCode,
+      onlineStatus: device?.onlineStatus,
+      fanStatus: device?.fanStatus,
+      lightStatus: device?.lightStatus,
+    })
+
+    if (controlPending) {
+      console.warn("[CTRL][HOME] toggle ignored because another command is pending", {
+        target,
+        controlPending,
+      })
+      return
+    }
+
+    const token = window.localStorage.getItem("plantcloud_token") || ""
+    if (!token) {
+      console.warn("[CTRL][HOME] toggle blocked because token is missing", { target })
+      setRealtimeError("请先登录后再控制设备")
+      return
+    }
+
+    if (deviceId === null || deviceId === undefined) {
+      console.warn("[CTRL][HOME] toggle blocked because E53IA1 deviceId is missing", {
+        target,
+        plantId: plantApiId,
+        device,
+      })
+      setRealtimeError("未获取到 E53IA1 设备，无法下发控制指令")
+      return
+    }
+
+    try {
+      setControlPending(target)
+      setRealtimeError(null)
+      console.info("[CTRL][HOME] calling controlHomeDevice", {
+        target,
+        plantId: plantApiId,
+        deviceId,
+        commandValue: nextValue ? "ON" : "OFF",
+      })
+      await controlHomeDevice(plantApiId, deviceId, target, nextValue, token)
+      console.info("[CTRL][HOME] controlHomeDevice success", {
+        target,
+        plantId: plantApiId,
+        deviceId,
+        commandValue: nextValue ? "ON" : "OFF",
+      })
+      try {
+        await refreshRealtimeData(token)
+        ;[800, 1800, 3200].forEach((delay) => window.setTimeout(() => {
+          void refreshRealtimeData(token).catch(() => undefined)
+        }, delay))
+      } catch (error) {
+        console.warn("[CTRL][HOME] refresh after control failed", error)
+        setRealtimeError(error instanceof Error ? error.message : "实时状态刷新失败")
+      }
+    } catch (error) {
+      console.error("[CTRL][HOME] controlHomeDevice failed", error)
+      setRealtimeError(error instanceof Error ? error.message : "设备控制失败")
+    } finally {
+      setControlPending(null)
+    }
+  }
 
   return (
     <AuthGuard>
@@ -220,7 +399,7 @@ export default function HomePage() {
                   >
                     {activityLogs.length > 0 ? (
                       activityLogs.map((log, index) => {
-                        const severityMeta = getSeverityMeta(log.severity)
+                        const severityMeta = getActivityLogMeta(log)
                         return (
                           <div
                             key={`${log.id}-${index}`}
@@ -233,7 +412,7 @@ export default function HomePage() {
                               <p className={`truncate text-sm font-medium ${severityMeta.titleClass}`}>
                                 {getLogText(log.title)}
                               </p>
-                              <p className="mt-1 text-xs font-mono text-muted-foreground">
+                              <p className={`mt-1 text-xs font-mono ${severityMeta.timeClass}`}>
                                 {formatLogTime(log.createdAt)}
                               </p>
                             </div>
@@ -267,7 +446,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center flex-1 min-h-0 py-3">
                   <div className="relative mb-3 w-full flex justify-center flex-1 min-h-0">
-                    <div className="relative border-2 border-primary/20 rounded-3xl p-4 bg-gradient-to-br from-primary/5 to-transparent w-full max-w-xs flex items-center justify-center">
+                    <div className="pointer-events-none relative border-2 border-primary/20 rounded-3xl p-4 bg-gradient-to-br from-primary/5 to-transparent w-full max-w-xs flex items-center justify-center">
                       <div className="pointer-events-none absolute inset-0 bg-primary/5 rounded-full blur-3xl scale-150" />
                       <div className="relative z-10 scale-110">
                         <PixelPlant state={plantState} size="xl" />
@@ -276,21 +455,30 @@ export default function HomePage() {
                   </div>
 
                   {/* 控制面板 */}
-                  <div className="pointer-events-auto relative z-20 flex shrink-0 items-center justify-between w-full max-w-xl bg-muted/30 rounded-2xl p-4 border">
-                    <DeviceControl type="light" isOn={lightOn} onToggle={setLightOn} />
-                    <div className="w-px h-8 bg-border mx-2" />
-                    <DeviceControl type="fan" isOn={fanOn} onToggle={setFanOn} />
-                    <div className="w-px h-8 bg-border mx-2" />
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="p-2 rounded-xl bg-primary/10">
-                        <div className="h-5 w-5 flex items-center justify-center">
-                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                        </div>
+                  <div className="pointer-events-auto relative z-50 grid w-full max-w-[640px] shrink-0 grid-cols-1 gap-2.5 rounded-2xl border bg-muted/25 p-3 shadow-sm sm:grid-cols-3">
+                    <DeviceControl
+                      type="light"
+                      isOn={lightOn}
+                      disabled={controlPending !== null || lightOn === null}
+                      onToggle={(value) => void handleDeviceToggle("light", value)}
+                    />
+                    <DeviceControl
+                      type="fan"
+                      isOn={fanOn}
+                      disabled={controlPending !== null || fanOn === null}
+                      onToggle={(value) => void handleDeviceToggle("fan", value)}
+                    />
+                    <div className={`flex h-[72px] min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2.5 shadow-sm ${connectionMeta.cardClass}`}>
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${connectionMeta.iconClass}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${connectionMeta.dotClass}`} />
                       </div>
-                      <div className="flex-1 min-w-[100px]">
-                        <p className="font-medium text-sm">小熊派已连接</p>
-                        <p className="text-xs text-muted-foreground">延时: 23ms</p>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <p className="whitespace-nowrap text-sm font-semibold text-foreground">小熊派</p>
+                        <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">{connectionMeta.detail}</p>
                       </div>
+                      <Badge variant="outline" className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-full px-0 text-[11px] font-semibold tracking-normal ${connectionMeta.badgeClass}`}>
+                        {connectionMeta.title}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
