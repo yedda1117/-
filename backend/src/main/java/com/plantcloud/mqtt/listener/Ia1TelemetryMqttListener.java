@@ -1,25 +1,17 @@
 package com.plantcloud.mqtt.listener;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.plantcloud.device.entity.Device;
 import com.plantcloud.device.mapper.DeviceMapper;
-import com.plantcloud.monitoring.entity.HumidityData;
-import com.plantcloud.monitoring.entity.LightData;
-import com.plantcloud.monitoring.entity.TemperatureData;
-import com.plantcloud.monitoring.mapper.HumidityDataMapper;
-import com.plantcloud.monitoring.mapper.LightDataMapper;
-import com.plantcloud.monitoring.mapper.TemperatureDataMapper;
 import com.plantcloud.mqtt.dto.TelemetryPayload;
+import com.plantcloud.mqtt.service.impl.TelemetryPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -43,17 +35,15 @@ public class Ia1TelemetryMqttListener {
 
     private final ObjectMapper objectMapper;
     private final DeviceMapper deviceMapper;
-    private final TemperatureDataMapper temperatureDataMapper;
-    private final HumidityDataMapper humidityDataMapper;
-    private final LightDataMapper lightDataMapper;
+    private final TelemetryPersistenceService telemetryPersistenceService;
 
     /**
-     * Handles telemetry message from device.
-     *
-     * @param topic   MQTT topic (e.g. "device/123/ia1/telemetry")
-     * @param payload JSON payload string
+     * Async entrance:
+     * 1. Parse JSON outside transaction
+     * 2. Resolve target device outside transaction
+     * 3. Persist telemetry in a short transaction
      */
-    @Transactional(rollbackFor = Exception.class)
+    @Async("telemetryExecutor")
     public void onMessage(String topic, String payload) {
         try {
             String topicDeviceToken = extractDeviceToken(topic);
@@ -73,22 +63,17 @@ public class Ia1TelemetryMqttListener {
                 return;
             }
 
-            LocalDateTime collectedAt = resolveCollectedAt(telemetry.getTimestamp());
-
-            saveTemperatureData(device, telemetry, payload, collectedAt);
-            saveHumidityData(device, telemetry, payload, collectedAt);
-            saveLightData(device, telemetry, payload, collectedAt);
-
-            updateDeviceStatus(device, telemetry);
-
+            telemetryPersistenceService.persistTelemetry(
+                    device,
+                    telemetry,
+                    payload,
+                    resolveCollectedAt(telemetry.getTimestamp())
+            );
         } catch (Exception ex) {
             log.error("Failed to process telemetry message. topic={}, payload={}", topic, payload, ex);
         }
     }
 
-    /**
-     * Extracts device token from topic pattern: device/{deviceIdOrCode}/ia1/telemetry
-     */
     private String extractDeviceToken(String topic) {
         Matcher matcher = IA1_TELEMETRY_TOPIC_PATTERN.matcher(topic);
         if (matcher.matches()) {

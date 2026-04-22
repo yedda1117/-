@@ -10,7 +10,6 @@ import com.plantcloud.control.enums.ControlTarget;
 import com.plantcloud.control.exception.DeviceNotFoundException;
 import com.plantcloud.control.exception.InvalidCommandException;
 import com.plantcloud.control.exception.MqttPublishException;
-import com.plantcloud.control.mapper.DeviceCommandLogMapper;
 import com.plantcloud.control.model.PublishResult;
 import com.plantcloud.control.service.DeviceCommandService;
 import com.plantcloud.control.service.MqttPublishService;
@@ -36,26 +35,20 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     private static final String DEVICE_CODE_E53IA1 = "E53IA1";
 
     private final DeviceMapper deviceMapper;
-    private final DeviceCommandLogMapper logMapper;
     private final MqttPublishService mqttService;
     private final ObjectMapper objectMapper;
+    private final DeviceCommandPersistenceService commandPersistenceService;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public ControlCommandVO controlLight(DeviceControlRequest request) {
         return execute(request, ControlTarget.LIGHT);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public ControlCommandVO controlFan(DeviceControlRequest request) {
         return execute(request, ControlTarget.FAN);
     }
 
-    /**
-     * 核心控制流程
-     * 不加 @Transactional，避免内部调用导致事务失效
-     */
     private ControlCommandVO execute(DeviceControlRequest request, ControlTarget target) {
         log.info("[CTRL] service start plantId={} deviceId={} target={} commandValue={}",
                 request.getPlantId(), request.getDeviceId(), target, request.getCommandValue());
@@ -71,7 +64,6 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
                 device.getOnlineStatus(), device.getMqttTopicDown());
 
         validateTargetDeviceType(target, device);
-
         String action = normalizeAction(request.getCommandValue());
 
         if (!isDeviceOnline(device)) {
@@ -79,8 +71,9 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         }
 
         String payload = buildPayload(target, action);
-        DeviceCommandLog commandLog = buildPendingLog(request, action, payload);
-        logMapper.insert(commandLog);
+        DeviceCommandLog commandLog = commandPersistenceService.createPendingLog(
+                buildPendingLog(request, action, payload)
+        );
 
         try {
             String topic = buildTopic(device);
@@ -92,9 +85,7 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
             if (!result.isSuccess()) {
                 throw new MqttPublishException(
-                        result.getErrorMessage() != null
-                                ? result.getErrorMessage()
-                                : "MQTT publish failed"
+                        result.getErrorMessage() != null ? result.getErrorMessage() : "MQTT publish failed"
                 );
             }
 
@@ -147,7 +138,6 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         if (!"ON".equals(normalized) && !"OFF".equals(normalized)) {
             throw new InvalidCommandException("Only ON/OFF allowed, got: " + action);
         }
-
         return normalized;
     }
 
@@ -157,8 +147,8 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
             map.put("target", target.getValue());
             map.put("action", action);
             return objectMapper.writeValueAsString(map);
-        } catch (Exception e) {
-            throw new RuntimeException("Payload build failed", e);
+        } catch (Exception ex) {
+            throw new RuntimeException("Payload build failed", ex);
         }
     }
 
@@ -174,7 +164,6 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         if (device.getMqttTopicDown() != null && !device.getMqttTopicDown().isBlank()) {
             return device.getMqttTopicDown();
         }
-
         return "device/" + device.getId() + "/ia1/control";
     }
 
@@ -251,11 +240,11 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         commandLog.setErrorMessage("Device offline");
         commandLog.setExecutedAt(LocalDateTime.now());
 
-        logMapper.insert(commandLog);
+        commandPersistenceService.createOfflineLog(commandLog);
+        log.warn("Device command skipped because device is offline. deviceId={}, logId={}",
+                req.getDeviceId(), commandLog.getId());
 
-        log.warn("设备离线，控制失败. deviceId={}, logId={}", req.getDeviceId(), commandLog.getId());
-
-        return buildVO(commandLog, "设备离线，指令执行失败");
+        return buildVO(commandLog, "Device is offline");
     }
 
     private ControlCommandVO buildVO(DeviceCommandLog commandLog, String message) {
@@ -268,3 +257,4 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
                 .build();
     }
 }
+
