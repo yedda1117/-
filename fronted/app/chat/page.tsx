@@ -329,13 +329,13 @@ function DynamicBookshelf({
   const visibleFiles = files.length > 0 ? files : fallbackFiles
 
   return (
-    <aside className="flex min-h-0 flex-col border-l border-emerald-100/80 bg-gradient-to-b from-emerald-950 via-teal-800 to-cyan-700 p-5 text-white">
+    <aside className="flex min-h-0 flex-col border-l border-white/10 bg-gradient-to-b from-emerald-950 via-teal-900 to-cyan-800 p-6 text-white">
       <div className="mb-5 flex items-center justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-100/60">Knowledge</p>
-          <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-white">
-            <LibraryBig className="h-4 w-4 text-lime-200" />
-            资料知识库
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-50/46">Knowledge Files</p>
+          <h2 className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-tight text-white">
+            <LibraryBig className="h-4 w-4 text-lime-200/90" />
+            植物知识库
           </h2>
         </div>
         {isFilesLoading ? <Loader2 className="h-5 w-5 animate-spin text-lime-200" /> : <Badge className="rounded-full bg-white/18 px-3 text-white hover:bg-white/18">{files.length}</Badge>}
@@ -401,7 +401,7 @@ function DynamicBookshelf({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="knowledge-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1.5">
         {visibleFiles.map((file, index) => {
           const active = index === selectedIndex
           return (
@@ -712,25 +712,28 @@ export default function ChatPage() {
   return (
     <AuthGuard>
       <div className="relative min-h-screen overflow-hidden bg-[#dce8df] text-zinc-950">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(220,232,223,0.94),rgba(211,244,225,0.9)_62%,rgba(117,226,190,0.86))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(190,242,100,0.26),transparent_28%),radial-gradient(circle_at_88%_16%,rgba(45,212,191,0.18),transparent_30%),linear-gradient(180deg,rgba(232,244,235,0.98),rgba(218,243,226,0.94)_56%,rgba(157,231,207,0.86))]" />
 
-        <main className="relative mx-auto flex min-h-screen max-w-[1360px] flex-col justify-center px-6 py-8 lg:px-10">
-          <section className="grid h-[calc(100vh-4rem)] min-h-[710px] max-h-[860px] overflow-hidden rounded-[2.4rem] border-[10px] border-white/82 bg-white/62 shadow-2xl shadow-emerald-950/18 backdrop-blur-xl lg:grid-cols-[210px_minmax(0,1fr)_290px]">
-            <aside className="hidden min-h-0 flex-col border-r border-white/10 bg-gradient-to-b from-emerald-950 via-teal-800 to-cyan-700 p-6 text-white lg:flex">
+        <main className="relative flex min-h-screen w-full flex-col px-5 py-5 lg:px-6">
+          <section className="grid h-[calc(100vh-2.5rem)] min-h-[680px] overflow-hidden rounded-[2rem] border border-white/72 bg-white/46 shadow-2xl shadow-emerald-950/14 backdrop-blur-xl lg:grid-cols-[260px_minmax(0,1fr)_350px]">
+            <aside className="hidden min-h-0 flex-col border-r border-white/18 bg-gradient-to-b from-emerald-800 via-teal-700 to-cyan-700 p-7 text-white lg:flex">
               <div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lime-200 text-emerald-950 shadow-lg shadow-black/15">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lime-100/90 text-emerald-900 shadow-lg shadow-emerald-950/10">
                   <Bot className="h-6 w-6" />
                 </div>
-                <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">植物问答助手</h2>
-                <p className="mt-3 text-sm leading-6 text-cyan-50/68">围绕养护知识、环境数据和自动化策略进行问答。</p>
+                <div className="mt-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-50/58">Plant Assistant</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">植物问答助手</h2>
+                  <p className="mt-3 text-sm leading-6 text-cyan-50/78">围绕养护知识、环境数据和自动化策略进行问答。</p>
+                </div>
 
-                <div className="mt-7 rounded-[1.4rem] border border-white/14 bg-white/14 p-4 shadow-xl shadow-black/10 backdrop-blur">
+                <div className="mt-7 rounded-[1.4rem] border border-white/24 bg-white/18 p-4 shadow-xl shadow-emerald-950/10 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{currentPlant.emoji} {currentPlant.name}</p>
-                      <p className="mt-1 text-xs text-cyan-50/62">实时生长环境</p>
+                      <p className="mt-1 text-xs text-cyan-50/72">实时生长环境</p>
                     </div>
-                    {isRealtimeLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-lime-200" /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-lime-200" />}
+                    {isRealtimeLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-lime-100" /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-lime-100" />}
                   </div>
 
                   <div className="mt-4 grid gap-2">
@@ -739,10 +742,10 @@ export default function ChatPage() {
                       ["湿度", formatMetricValue(realtimeStatus?.environment.humidity, "%"), normalizeStatus(realtimeStatus?.environment.humidityStatus)],
                       ["光照", formatMetricValue(realtimeStatus?.environment.lightLux, " lux"), normalizeStatus(realtimeStatus?.environment.lightStatus)],
                     ].map(([label, value, status]) => (
-                      <div key={label} className="rounded-[1rem] bg-white/12 px-3 py-2">
+                      <div key={label} className="rounded-[1rem] bg-white/18 px-3 py-2">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-medium text-cyan-50/68">{label}</span>
-                          <span className="rounded-full bg-lime-200/90 px-2 py-0.5 text-[10px] font-medium text-emerald-950">{status}</span>
+                          <span className="text-xs font-medium text-cyan-50/76">{label}</span>
+                          <span className="rounded-full bg-lime-100/88 px-2 py-0.5 text-[10px] font-medium text-emerald-900">{status}</span>
                         </div>
                         <p className="mt-1 text-sm font-semibold text-white">{isRealtimeLoading ? "..." : value}</p>
                       </div>
@@ -752,7 +755,7 @@ export default function ChatPage() {
               </div>
             </aside>
 
-            <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-emerald-50/75 via-white/78 to-white/92 px-6 py-6">
+            <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-emerald-50/62 via-white/72 to-white/88 px-7 py-6">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {!hasStartedChat ? (
                   <div className="flex shrink-0 justify-center py-7">
