@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.List;
 
 @Service
@@ -26,6 +27,34 @@ import java.util.List;
 public class AlertServiceImpl implements AlertService {
 
     private static final long MAX_PAGE_SIZE = 100L;
+    private static final Map<String, String> LOCALIZED_TITLES = Map.ofEntries(
+            Map.entry("Smoke or gas fluctuation", "\u70df\u96fe/\u6c14\u4f53\u6ce2\u52a8\u63d0\u9192"),
+            Map.entry("Air quality fluctuation", "\u7a7a\u6c14\u8d28\u91cf\u6ce2\u52a8\u63d0\u9192"),
+            Map.entry("Strong smoke alert", "\u70df\u96fe/\u6c14\u4f53\u4e25\u91cd\u544a\u8b66"),
+            Map.entry("Smoke alert resolved", "\u70df\u96fe/\u6c14\u4f53\u544a\u8b66\u5df2\u6062\u590d"),
+            Map.entry("Air quality warning", "\u7a7a\u6c14\u8d28\u91cf\u544a\u8b66"),
+            Map.entry("Air quality monitoring", "\u7a7a\u6c14\u8d28\u91cf\u89c2\u5bdf\u63d0\u9192"),
+            Map.entry("Air quality spike", "\u7a7a\u6c14\u8d28\u91cf\u77ed\u65f6\u5347\u9ad8"),
+            Map.entry("Ventilation reminder", "\u901a\u98ce\u63d0\u9192")
+    );
+    private static final Map<String, String> LOCALIZED_CONTENTS = Map.ofEntries(
+            Map.entry("A mild smoke or gas fluctuation was detected and later recovered.",
+                    "\u68c0\u6d4b\u5230\u8f7b\u5fae\u70df\u96fe/\u6c14\u4f53\u6ce2\u52a8\uff0c\u540e\u7eed\u5df2\u6062\u590d\u6b63\u5e38\u3002"),
+            Map.entry("Air quality rose above baseline for a short time.",
+                    "\u7a7a\u6c14\u8d28\u91cf\u77ed\u65f6\u9ad8\u4e8e\u57fa\u51c6\u503c\uff0c\u8bf7\u7559\u610f\u73af\u5883\u53d8\u5316\u3002"),
+            Map.entry("A strong smoke or gas anomaly was detected.",
+                    "\u68c0\u6d4b\u5230\u8f83\u5f3a\u70df\u96fe/\u6c14\u4f53\u5f02\u5e38\uff0c\u8bf7\u53ca\u65f6\u68c0\u67e5\u73af\u5883\u4e0e\u8bbe\u5907\u3002"),
+            Map.entry("Air quality increased briefly before returning to normal.",
+                    "\u7a7a\u6c14\u8d28\u91cf\u77ed\u6682\u5347\u9ad8\u540e\u5df2\u6062\u590d\u6b63\u5e38\uff0c\u5efa\u8bae\u4fdd\u6301\u901a\u98ce\u89c2\u5bdf\u3002"),
+            Map.entry("High smoke or gas concentration was detected and then resolved.",
+                    "\u68c0\u6d4b\u5230\u8f83\u9ad8\u70df\u96fe/\u6c14\u4f53\u6d53\u5ea6\uff0c\u540e\u7eed\u5df2\u6062\u590d\u6b63\u5e38\u3002"),
+            Map.entry("Air quality remains slightly elevated and should be monitored.",
+                    "\u7a7a\u6c14\u8d28\u91cf\u4ecd\u7565\u9ad8\uff0c\u5efa\u8bae\u6301\u7eed\u89c2\u5bdf\u5e76\u68c0\u67e5\u901a\u98ce\u60c5\u51b5\u3002"),
+            Map.entry("Air quality is still fluctuating and needs observation.",
+                    "\u7a7a\u6c14\u8d28\u91cf\u4ecd\u5728\u6ce2\u52a8\uff0c\u9700\u8981\u7ee7\u7eed\u89c2\u5bdf\u3002"),
+            Map.entry("Air quality was temporarily elevated and then recovered.",
+                    "\u7a7a\u6c14\u8d28\u91cf\u66fe\u77ed\u65f6\u5347\u9ad8\uff0c\u540e\u7eed\u5df2\u6062\u590d\u6b63\u5e38\u3002")
+    );
 
     private final AlertLogMapper alertLogMapper;
 
@@ -184,8 +213,8 @@ public class AlertServiceImpl implements AlertService {
                 .deviceId(alertLog.getDeviceId())
                 .alertType(alertLog.getAlertType())
                 .severity(alertLog.getSeverity())
-                .title(alertLog.getTitle())
-                .content(alertLog.getContent())
+                .title(localizeTitle(alertLog))
+                .content(localizeContent(alertLog))
                 .metricName(alertLog.getMetricName())
                 .metricValue(alertLog.getMetricValue())
                 .thresholdValue(alertLog.getThresholdValue())
@@ -204,8 +233,8 @@ public class AlertServiceImpl implements AlertService {
                 .deviceId(alertLog.getDeviceId())
                 .alertType(alertLog.getAlertType())
                 .severity(alertLog.getSeverity())
-                .title(alertLog.getTitle())
-                .content(alertLog.getContent())
+                .title(localizeTitle(alertLog))
+                .content(localizeContent(alertLog))
                 .metricName(alertLog.getMetricName())
                 .metricValue(alertLog.getMetricValue())
                 .thresholdValue(alertLog.getThresholdValue())
@@ -215,5 +244,21 @@ public class AlertServiceImpl implements AlertService {
                 .extraData(alertLog.getExtraData())
                 .createdAt(alertLog.getCreatedAt())
                 .build();
+    }
+
+    private String localizeTitle(AlertLog alertLog) {
+        String title = alertLog.getTitle();
+        if (StringUtils.hasText(title) && LOCALIZED_TITLES.containsKey(title)) {
+            return LOCALIZED_TITLES.get(title);
+        }
+        return title;
+    }
+
+    private String localizeContent(AlertLog alertLog) {
+        String content = alertLog.getContent();
+        if (StringUtils.hasText(content) && LOCALIZED_CONTENTS.containsKey(content)) {
+            return LOCALIZED_CONTENTS.get(content);
+        }
+        return content;
     }
 }

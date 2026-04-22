@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlantCloud Strategy Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shouldSuggest"],
+  "properties": {
+    "shouldSuggest": {
+      "type": "boolean"
+    },
+    "detected": {
+      "type": "string",
+      "minLength": 1
+    },
+    "strategyName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metricType": {
+      "type": "string",
+      "enum": ["LIGHT", "TEMPERATURE", "HUMIDITY"]
+    },
+    "operatorType": {
+      "type": "string",
+      "enum": ["LT", "GT", "EQ"]
+    },
+    "thresholdMin": {
+      "type": "number"
+    },
+    "actionType": {
+      "type": "string",
+      "enum": ["AUTO_LIGHT", "AUTO_FAN", "NOTIFY_USER"]
+    },
+    "actionValue": {
+      "type": "string",
+      "enum": ["ON", "OFF", "LOW", "HIGH", "INFO", "WARNING", "DANGER"]
+    },
+    "timeLimitEnabled": {
+      "type": "boolean"
+    },
+    "startTime": {
+      "type": ["string", "null"],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "endTime": {
+      "type": ["string", "null"],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "shouldSuggest": {
+            "const": true
+          }
+        },
+        "required": ["shouldSuggest"]
+      },
+      "then": {
+        "required": [
+          "detected",
+          "strategyName",
+          "metricType",
+          "operatorType",
+          "thresholdMin",
+          "actionType",
+          "actionValue",
+          "timeLimitEnabled",
+          "startTime",
+          "endTime",
+          "reason"
+        ]
+      }
+    }
+  ]
+}
