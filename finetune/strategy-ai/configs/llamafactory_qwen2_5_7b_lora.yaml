@@ -1,0 +1,39 @@
+### PlantCloud strategy model LoRA fine-tuning config for LLaMA-Factory.
+### Copy this file into your LLaMA-Factory workspace or adjust paths as needed.
+
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+
+model_name_or_path: Qwen/Qwen2.5-7B-Instruct
+template: qwen
+
+dataset: plantcloud_strategy_train
+eval_dataset: plantcloud_strategy_validation
+dataset_dir: data
+cutoff_len: 4096
+overwrite_cache: true
+preprocessing_num_workers: 4
+
+output_dir: saves/plantcloud-strategy-qwen2_5-7b-lora
+logging_steps: 10
+save_steps: 100
+plot_loss: true
+overwrite_output_dir: true
+
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 0.0001
+num_train_epochs: 3
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+bf16: true
+
+val_size: 0.0
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 100
+
+quantization_bit: 4
+flash_attn: auto
