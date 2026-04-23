@@ -11,11 +11,14 @@ import type {
   PhotoUploadResult,
   StrategyAgentProposal,
   UploadedFileItem,
+  DevicesStatus,
+  LoginResult,
 } from "./types"
 
 const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || "http://localhost:8080"
 const WEB_API_BASE_URL = import.meta.env.VITE_WEB_API_BASE_URL || "http://localhost:3000"
 const IA1_DEVICE_CODE = "E53IA1"
+const LONG_ID_FIELDS = ["id", "userId", "plantId", "createdBy", "targetDeviceId", "deviceId", "strategyId", "commandLogId"] as const
 
 type ApiResult<T> = {
   code?: number
@@ -41,6 +44,27 @@ type DeviceStatusOverview = {
   devices: DeviceStatusItem[]
 }
 
+function stringifyLongIdFields(responseText: string) {
+  return LONG_ID_FIELDS.reduce((text, field) => {
+    const pattern = new RegExp(`("${field}"\\s*:\\s*)(-?\\d{16,})`, "g")
+    return text.replace(pattern, '$1"$2"')
+  }, responseText)
+}
+
+function getUserIdFromToken(token: string | null | undefined) {
+  if (!token) return null
+  const payload = token.split(".")[1]
+  if (!payload) return null
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/")
+    const decoded = window.atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="))
+    const matched = decoded.match(/"userId"\s*:\s*("?)(-?\d+)\1/)
+    return matched?.[2] ?? null
+  } catch {
+    return null
+  }
+}
+
 function authHeaders(extra?: HeadersInit) {
   const headers = new Headers(extra)
   const token = window.localStorage.getItem("plantcloud_token")
@@ -50,10 +74,33 @@ function authHeaders(extra?: HeadersInit) {
   return headers
 }
 
+export function saveAuthSession(data: LoginResult) {
+  const exactUserId = getUserIdFromToken(data.accessToken) ?? String(data.userId)
+  window.localStorage.setItem("plantcloud_token", data.accessToken)
+  window.localStorage.setItem(
+    "plantcloud_user",
+    JSON.stringify({
+      userId: exactUserId,
+      username: data.username,
+      role: data.role,
+    }),
+  )
+}
+
+export function hasAuthSession() {
+  return Boolean(window.localStorage.getItem("plantcloud_token"))
+}
+
+export function clearAuthSession() {
+  window.localStorage.removeItem("plantcloud_token")
+  window.localStorage.removeItem("plantcloud_user")
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   let payload: ApiResult<T> | null = null
   try {
-    payload = (await response.json()) as ApiResult<T>
+    const responseText = await response.text()
+    payload = (responseText ? JSON.parse(stringifyLongIdFields(responseText)) : null) as ApiResult<T>
   } catch {
     payload = null
   }
@@ -147,6 +194,39 @@ export async function getPlants() {
     await fetch(`${BACKEND_BASE_URL}/plants`, {
       headers: authHeaders({ accept: "application/json" }),
       cache: "no-store",
+    }),
+  )
+}
+
+export async function loginWithPassword(username: string, password: string) {
+  return parseResponse<LoginResult>(
+    await fetch(`${BACKEND_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ username, password }),
+    }),
+  )
+}
+
+export async function loginWithFace(faceImage: string) {
+  return parseResponse<LoginResult>(
+    await fetch(`${BACKEND_BASE_URL}/auth/face-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ faceImage }),
+    }),
+  )
+}
+
+export async function registerWithFace(username: string, password: string, faceImage: string) {
+  return parseResponse<string | null>(
+    await fetch(`${BACKEND_BASE_URL}/auth/face-register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ username, password, faceImage }),
     }),
   )
 }
@@ -327,10 +407,25 @@ export async function createStrategyFromProposal(payload: Record<string, unknown
     body: JSON.stringify(payload),
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok || data?.code === 400 || data?.success === false) {
+  const businessCode = typeof data?.code === "number" ? data.code : undefined
+  if (!response.ok || data?.success === false || (businessCode !== undefined && businessCode !== 0)) {
     throw new Error(data?.message || data?.error || "新增策略失败")
   }
   return data
+}
+
+export async function getDevicesStatus(plantId: number | string) {
+  const response = await fetch(`${WEB_API_BASE_URL}/api/devices/status?plantId=${encodeURIComponent(String(plantId))}`, {
+    method: "GET",
+    headers: authHeaders({ accept: "application/json" }),
+    cache: "no-store",
+  })
+  const data = await response.json().catch(() => ({}))
+  const businessCode = typeof data?.code === "number" ? data.code : undefined
+  if (!response.ok || data?.success === false || (businessCode !== undefined && businessCode !== 0)) {
+    throw new Error(data?.message || data?.error || "获取设备状态失败")
+  }
+  return (data?.data ?? data) as DevicesStatus
 }
 
 export async function getCalendarSummary(plantId: number, year: number, month: number) {
