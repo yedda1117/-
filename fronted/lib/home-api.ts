@@ -1,4 +1,5 @@
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:8080"
+const IA1_DEVICE_CODE = "E53IA1"
 
 type ApiResult<T> = {
   code?: number
@@ -45,9 +46,48 @@ type PageResult<T> = {
   records: T[]
 }
 
+type DeviceStatusItem = {
+  deviceId: number | string | null
+  deviceCode: string | null
+  deviceName: string | null
+  deviceType: string | null
+  onlineStatus: string | null
+  currentStatus: string | null
+}
+
+type DeviceStatusOverview = {
+  plantId: number
+  devices: DeviceStatusItem[]
+}
+
+type HomeDeviceStatus = {
+  deviceId: number | string | null
+  deviceCode: string | null
+  deviceName: string | null
+  onlineStatus: string | null
+  connected: boolean | null
+  fanStatus: string | null
+  fanOn: boolean | null
+  lightStatus: string | null
+  lightOn: boolean | null
+  statusUpdatedAt: string | null
+  rawStatus: string | null
+}
+
+type ControlCommandResult = {
+  commandLogId: number | string | null
+  commandName: string | null
+  commandValue: string | null
+  executeStatus: string | null
+  message: string | null
+}
+
+export type HomeControlTarget = "light" | "fan"
+
 export type HomeRealtimeData = {
   environment: EnvironmentData
   infrared: InfraredData
+  device: HomeDeviceStatus
   activityLogs: AlertItem[]
   tilt: {
     hasAlert: boolean
@@ -92,6 +132,92 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return (payload?.data ?? payload) as T
 }
 
+function parseStatusJson(rawStatus: string | null | undefined) {
+  if (!rawStatus) return {}
+  try {
+    const parsed = JSON.parse(rawStatus)
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function getStringField(source: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (typeof value === "number" || typeof value === "boolean") return String(value)
+  }
+  return null
+}
+
+function parseSwitchState(value: string | null | undefined) {
+  if (!value) return null
+  switch (value.trim().toUpperCase()) {
+    case "ON":
+    case "OPEN":
+    case "RUNNING":
+    case "TRUE":
+    case "1":
+      return true
+    case "OFF":
+    case "CLOSE":
+    case "CLOSED":
+    case "STOPPED":
+    case "FALSE":
+    case "0":
+      return false
+    default:
+      return null
+  }
+}
+
+function parseOnlineState(value: string | null | undefined) {
+  if (!value) return null
+  switch (value.trim().toUpperCase()) {
+    case "ONLINE":
+      return true
+    case "OFFLINE":
+      return false
+    default:
+      return null
+  }
+}
+
+function findIa1Device(devices: DeviceStatusItem[]) {
+  return devices.find((device) => (device.deviceCode || "").toUpperCase() === IA1_DEVICE_CODE)
+    || devices.find((device) => (device.deviceType || "").toUpperCase() === "IA1")
+    || devices.find((device) => {
+      const status = parseStatusJson(device.currentStatus)
+      return "fanStatus" in status || "lightStatus" in status || "mqttStatus" in status
+    })
+    || null
+}
+
+function buildHomeDeviceStatus(overview: DeviceStatusOverview): HomeDeviceStatus {
+  const device = findIa1Device(overview.devices || [])
+  const status = parseStatusJson(device?.currentStatus)
+  const mqttStatus = getStringField(status, "mqttStatus", "onlineStatus", "status")
+  const statusUpdatedAt = getStringField(status, "statusUpdatedAt", "commandUpdatedAt", "telemetryUpdatedAt")
+  const fanStatus = getStringField(status, "fanStatus", "fan_status", "fan")
+  const lightStatus = getStringField(status, "lightStatus", "light_status", "light")
+  const onlineStatus = device?.onlineStatus || mqttStatus
+
+  return {
+    deviceId: device?.deviceId ?? null,
+    deviceCode: device?.deviceCode ?? null,
+    deviceName: device?.deviceName ?? null,
+    onlineStatus: onlineStatus ?? null,
+    connected: parseOnlineState(onlineStatus),
+    fanStatus,
+    fanOn: parseSwitchState(fanStatus),
+    lightStatus,
+    lightOn: parseSwitchState(lightStatus),
+    statusUpdatedAt,
+    rawStatus: device?.currentStatus ?? null,
+  }
+}
+
 export async function getHomeRealtime(plantId: number, token: string) {
   const headers: HeadersInit = token
     ? {
@@ -99,12 +225,16 @@ export async function getHomeRealtime(plantId: number, token: string) {
       }
     : {}
 
-  const [environmentResponse, infraredResponse, alertsResponse, alertLogsResponse] = await Promise.all([
+  const [environmentResponse, infraredResponse, deviceStatusResponse, alertsResponse, alertLogsResponse] = await Promise.all([
     fetch(`${BACKEND_BASE_URL}/monitoring/environment/current?plantId=${plantId}`, {
       cache: "no-store",
       headers,
     }),
     fetch(`${BACKEND_BASE_URL}/devices/infrared`, {
+      cache: "no-store",
+      headers,
+    }),
+    fetch(`${BACKEND_BASE_URL}/monitoring/devices/status?plantId=${plantId}`, {
       cache: "no-store",
       headers,
     }),
@@ -118,9 +248,10 @@ export async function getHomeRealtime(plantId: number, token: string) {
     }),
   ])
 
-  const [environment, infrared, alerts, alertLogs] = await Promise.all([
+  const [environment, infrared, deviceStatus, alerts, alertLogs] = await Promise.all([
     parseResponse<EnvironmentData>(environmentResponse),
     parseResponse<InfraredData>(infraredResponse),
+    parseResponse<DeviceStatusOverview>(deviceStatusResponse),
     parseResponse<AlertItem[]>(alertsResponse),
     parseResponse<PageResult<AlertItem>>(alertLogsResponse),
   ])
@@ -148,6 +279,7 @@ export async function getHomeRealtime(plantId: number, token: string) {
   return {
     environment,
     infrared: effectiveInfrared,
+    device: buildHomeDeviceStatus(deviceStatus),
     activityLogs: effectiveLogs,
     tilt: {
       count: tiltAlerts.length,
@@ -166,4 +298,55 @@ export async function getHomeRealtime(plantId: number, token: string) {
       latestCreatedAt: latestVisibleAlert?.createdAt || null,
     },
   } satisfies HomeRealtimeData
+}
+
+export async function controlHomeDevice(
+  plantId: number,
+  deviceId: number | string,
+  target: HomeControlTarget,
+  turnOn: boolean,
+  token: string,
+) {
+  const endpoint = target === "light" ? "/control/light" : "/control/fan"
+  const url = `${BACKEND_BASE_URL}${endpoint}`
+  const body = {
+    plantId,
+    deviceId,
+    commandValue: turnOn ? "ON" : "OFF",
+  }
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  console.info("[CTRL][FRONTEND] request", {
+    path: endpoint,
+    url,
+    method: "POST",
+    body,
+  })
+
+  const response = await fetch(url, {
+    method: "POST",
+    cache: "no-store",
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  const responseText = await response.clone().text().catch(() => "")
+  console.info("[CTRL][FRONTEND] response", {
+    path: endpoint,
+    status: response.status,
+    ok: response.ok,
+    body: responseText,
+  })
+
+  const result = await parseResponse<ControlCommandResult>(response)
+  if ((result.executeStatus || "").toUpperCase() === "FAILED") {
+    throw new ApiError(result.message || "设备控制失败", response.status)
+  }
+
+  return result
 }

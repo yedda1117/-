@@ -29,18 +29,77 @@ public class MqttClientStarter {
     @PostConstruct
     public void start() {
         try {
-            mqttClient = new MqttClient(
-                    mqttProperties.getBrokerUrl(),
-                    mqttProperties.getClientId(),
-                    new MemoryPersistence()
-            );
-            deviceAlertMqttCallback.setMqttClient(mqttClient);
-            mqttClient.setCallback(deviceAlertMqttCallback);
-            mqttClient.connect(mqttConnectOptions);
+            ensureConnected();
             log.info("MQTT client started. broker={}, clientId={}",
                     mqttProperties.getBrokerUrl(), mqttProperties.getClientId());
         } catch (MqttException ex) {
             throw new IllegalStateException("Failed to start MQTT client", ex);
+        }
+    }
+
+    public synchronized MqttClient ensureConnected() throws MqttException {
+        if (mqttClient == null) {
+            mqttClient = createMqttClient();
+        }
+
+        if (!mqttClient.isConnected()) {
+            log.warn("MQTT client is disconnected, trying to connect. broker={}, clientId={}",
+                    mqttProperties.getBrokerUrl(), mqttProperties.getClientId());
+            try {
+                mqttClient.connect(mqttConnectOptions);
+            } catch (MqttException ex) {
+                log.warn("MQTT client connect failed, will recreate client. broker={}, clientId={}, reasonCode={}, error={}",
+                        mqttProperties.getBrokerUrl(), mqttProperties.getClientId(), ex.getReasonCode(), ex.getMessage());
+                closeClientQuietly(mqttClient);
+                mqttClient = createMqttClient();
+                mqttClient.connect(mqttConnectOptions);
+            }
+            log.info("MQTT client connected. broker={}, clientId={}",
+                    mqttProperties.getBrokerUrl(), mqttProperties.getClientId());
+        }
+
+        return mqttClient;
+    }
+
+    public synchronized MqttClient reconnect() throws MqttException {
+        closeClientQuietly(mqttClient);
+        mqttClient = createMqttClient();
+        mqttClient.connect(mqttConnectOptions);
+        log.info("MQTT client reconnected. broker={}, clientId={}",
+                mqttProperties.getBrokerUrl(), mqttProperties.getClientId());
+        return mqttClient;
+    }
+
+    private MqttClient createMqttClient() throws MqttException {
+        MqttClient client = new MqttClient(
+                mqttProperties.getBrokerUrl(),
+                mqttProperties.getClientId(),
+                new MemoryPersistence()
+        );
+        deviceAlertMqttCallback.setMqttClient(client);
+        client.setCallback(deviceAlertMqttCallback);
+        return client;
+    }
+
+    private void closeClientQuietly(MqttClient client) {
+        if (client == null) {
+            return;
+        }
+
+        try {
+            if (client.isConnected()) {
+                client.disconnect();
+            }
+        } catch (MqttException ex) {
+            log.warn("Failed to disconnect MQTT client before reconnect. reasonCode={}, error={}",
+                    ex.getReasonCode(), ex.getMessage());
+        }
+
+        try {
+            client.close(true);
+        } catch (MqttException ex) {
+            log.warn("Failed to close MQTT client before reconnect. reasonCode={}, error={}",
+                    ex.getReasonCode(), ex.getMessage());
         }
     }
 

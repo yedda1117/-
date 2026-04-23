@@ -1,6 +1,8 @@
 package com.plantcloud.control.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.plantcloud.control.dto.DeviceControlRequest;
 import com.plantcloud.control.entity.DeviceCommandLog;
 import com.plantcloud.control.enums.CommandStatus;
@@ -17,15 +19,18 @@ import com.plantcloud.device.mapper.DeviceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeviceCommandServiceImpl implements DeviceCommandService {
+
+    private static final String DEVICE_TYPE_IA1 = "IA1";
+    private static final String DEVICE_CODE_E53IA1 = "E53IA1";
 
     private final DeviceMapper deviceMapper;
     private final MqttPublishService mqttService;
@@ -43,13 +48,18 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     }
 
     private ControlCommandVO execute(DeviceControlRequest request, ControlTarget target) {
-        log.info("Processing device command. plantId={}, deviceId={}, target={}, command={}",
+        log.info("[CTRL] service start plantId={} deviceId={} target={} commandValue={}",
+                request.getPlantId(), request.getDeviceId(), target, request.getCommandValue());
+        log.info("开始执行控制命令. plantId={}, deviceId={}, target={}, command={}",
                 request.getPlantId(), request.getDeviceId(), target, request.getCommandValue());
 
         Device device = deviceMapper.selectById(request.getDeviceId());
         if (device == null) {
             throw new DeviceNotFoundException("Device not found: " + request.getDeviceId());
         }
+        log.info("[CTRL] device resolved id={} code={} type={} onlineStatus={} mqttTopicDown={}",
+                device.getId(), device.getDeviceCode(), device.getDeviceType(),
+                device.getOnlineStatus(), device.getMqttTopicDown());
 
         validateTargetDeviceType(target, device);
         String action = normalizeAction(request.getCommandValue());
@@ -65,7 +75,12 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
         try {
             String topic = buildTopic(device);
+            log.info("[CTRL] resolved topic={}", topic);
+            log.info("[CTRL] resolved payload={}", payload);
             PublishResult result = mqttService.publish(topic, payload);
+            log.info("[CTRL] mqtt publish returned success={} errorMessage={}",
+                    result.isSuccess(), result.getErrorMessage());
+
             if (!result.isSuccess()) {
                 throw new MqttPublishException(
                         result.getErrorMessage() != null ? result.getErrorMessage() : "MQTT publish failed"
@@ -73,17 +88,29 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
             }
 
             commandPersistenceService.markSuccess(commandLog);
-            log.info("Device command succeeded. logId={}, topic={}", commandLog.getId(), topic);
-            return buildVO(commandLog, "Command published successfully");
-        } catch (Exception ex) {
-            commandPersistenceService.markFailed(commandLog, ex.getMessage());
-            log.error("Device command failed. logId={}, deviceId={}", commandLog.getId(), request.getDeviceId(), ex);
-            throw new MqttPublishException("MQTT publish failed: " + ex.getMessage(), ex);
+            updateDeviceCommandStatus(device, target, action);
+            log.info("[CTRL] command success logId={} topic={} payload={}", commandLog.getId(), topic, payload);
+            log.info("控制命令执行成功. logId={}, topic={}", commandLog.getId(), topic);
+
+            return buildVO(commandLog, "控制指令下发成功");
+
+        } catch (Exception e) {
+            log.error("[CTRL] command failed logId={} deviceId={} target={} commandValue={}",
+                    commandLog.getId(), request.getDeviceId(), target, request.getCommandValue(), e);
+
+            commandPersistenceService.markFailed(commandLog, e.getMessage());
+
+            log.error("控制命令执行失败. logId={}, deviceId={}", commandLog.getId(), request.getDeviceId(), e);
+
+            throw new MqttPublishException("MQTT publish failed: " + e.getMessage(), e);
         }
     }
 
     private void validateTargetDeviceType(ControlTarget target, Device device) {
         String deviceType = device.getDeviceType();
+        if (isIa1Device(device)) {
+            return;
+        }
         if (target == ControlTarget.LIGHT && !"FILL_LIGHT".equalsIgnoreCase(deviceType)) {
             throw new InvalidCommandException("Device type mismatch: LIGHT control requires device type FILL_LIGHT");
         }
@@ -110,7 +137,7 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
 
     private String buildPayload(ControlTarget target, String action) {
         try {
-            Map<String, String> map = new HashMap<>();
+            Map<String, String> map = new LinkedHashMap<>();
             map.put("target", target.getValue());
             map.put("action", action);
             return objectMapper.writeValueAsString(map);
@@ -123,10 +150,54 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         if (device.getId() == null) {
             throw new RuntimeException("Device ID is null");
         }
+
+        if (isIa1Device(device) && StringUtils.hasText(device.getDeviceCode())) {
+            return "device/" + device.getDeviceCode() + "/ia1/control";
+        }
+
         if (device.getMqttTopicDown() != null && !device.getMqttTopicDown().isBlank()) {
             return device.getMqttTopicDown();
         }
         return "device/" + device.getId() + "/ia1/control";
+    }
+
+    private boolean isIa1Device(Device device) {
+        return DEVICE_TYPE_IA1.equalsIgnoreCase(device.getDeviceType())
+                || DEVICE_CODE_E53IA1.equalsIgnoreCase(device.getDeviceCode());
+    }
+
+    private void updateDeviceCommandStatus(Device device, ControlTarget target, String action) {
+        ObjectNode statusNode = buildCurrentStatusNode(device.getCurrentStatus());
+
+        if (target == ControlTarget.FAN) {
+            statusNode.put("fanStatus", action);
+        } else if (target == ControlTarget.LIGHT) {
+            statusNode.put("lightStatus", action);
+        }
+
+        statusNode.put("mqttStatus", device.getOnlineStatus());
+        statusNode.put("online", isDeviceOnline(device));
+        statusNode.put("stateSource", "COMMAND");
+
+        device.setCurrentStatus(statusNode.toString());
+        deviceMapper.updateById(device);
+
+        log.info("[CTRL] current_status updated by command. deviceId={}, target={}, action={}, currentStatus={}",
+                device.getId(), target, action, device.getCurrentStatus());
+    }
+
+    private ObjectNode buildCurrentStatusNode(String currentStatus) {
+        try {
+            if (StringUtils.hasText(currentStatus)) {
+                JsonNode node = objectMapper.readTree(currentStatus);
+                if (node.isObject()) {
+                    return (ObjectNode) node;
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("[CTRL] invalid current_status JSON, will rebuild. currentStatus={}", currentStatus);
+        }
+        return objectMapper.createObjectNode();
     }
 
     private DeviceCommandLog buildPendingLog(DeviceControlRequest req, String action, String payload) {
@@ -157,7 +228,6 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         commandLog.setResponsePayload(null);
         commandLog.setExecuteStatus(CommandStatus.FAILED.name());
         commandLog.setErrorMessage("Device offline");
-        commandLog.setExecutedAt(LocalDateTime.now());
 
         commandPersistenceService.createOfflineLog(commandLog);
         log.warn("Device command skipped because device is offline. deviceId={}, logId={}",
