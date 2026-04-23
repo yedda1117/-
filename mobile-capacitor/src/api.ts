@@ -88,12 +88,14 @@ function parseSwitchState(value: string | null | undefined) {
   if (!value) return null
   switch (value.trim().toUpperCase()) {
     case "ON":
+    case "TURN_ON":
     case "OPEN":
     case "RUNNING":
     case "TRUE":
     case "1":
       return true
     case "OFF":
+    case "TURN_OFF":
     case "CLOSE":
     case "CLOSED":
     case "STOPPED":
@@ -110,6 +112,10 @@ function parseOnlineState(value: string | null | undefined) {
   return value.trim().toUpperCase() === "ONLINE" ? true : value.trim().toUpperCase() === "OFFLINE" ? false : null
 }
 
+function firstKnownState<T>(...values: Array<T | null | undefined>) {
+  return values.find((value) => value !== null && value !== undefined) ?? null
+}
+
 function buildHomeDeviceStatus(overview: DeviceStatusOverview): HomeDeviceStatus {
   const devices = overview.devices || []
   const device =
@@ -120,23 +126,44 @@ function buildHomeDeviceStatus(overview: DeviceStatusOverview): HomeDeviceStatus
       return "fanStatus" in status || "lightStatus" in status || "mqttStatus" in status
     }) ||
     null
+  const fanDevice = devices.find((item) => (item.deviceType || "").toUpperCase() === "FAN") || null
+  const lightDevice = devices.find((item) => (item.deviceType || "").toUpperCase() === "FILL_LIGHT") || null
+  const infraredDevice = devices.find((item) => (item.deviceType || "").toUpperCase() === "PIR_SENSOR") || null
   const status = parseStatusJson(device?.currentStatus)
+  const fanDeviceStatus = parseStatusJson(fanDevice?.currentStatus)
+  const lightDeviceStatus = parseStatusJson(lightDevice?.currentStatus)
+  const infraredDeviceStatus = parseStatusJson(infraredDevice?.currentStatus)
   const mqttStatus = getStringField(status, "mqttStatus", "onlineStatus", "status")
-  const fanStatus = getStringField(status, "fanStatus", "fan_status", "fan")
-  const lightStatus = getStringField(status, "lightStatus", "light_status", "light")
+  const fanStatus =
+    getStringField(fanDeviceStatus, "power", "status", "switch", "value", "fanStatus", "fan_status", "fan") ||
+    getStringField(status, "fanStatus", "fan_status", "fan")
+  const lightStatus =
+    getStringField(lightDeviceStatus, "power", "status", "switch", "value", "lightStatus", "light_status", "light") ||
+    getStringField(status, "lightStatus", "light_status", "light")
+  const infraredStatus = getStringField(infraredDeviceStatus, "detected", "pirStatus", "status", "value")
   const statusUpdatedAt = getStringField(status, "statusUpdatedAt", "commandUpdatedAt", "telemetryUpdatedAt")
   const onlineStatus = device?.onlineStatus || mqttStatus
+  const connected = firstKnownState(
+    parseOnlineState(onlineStatus),
+    parseOnlineState(fanDevice?.onlineStatus),
+    parseOnlineState(lightDevice?.onlineStatus),
+  )
 
   return {
     deviceId: device?.deviceId ?? null,
     deviceCode: device?.deviceCode ?? null,
     deviceName: device?.deviceName ?? null,
     onlineStatus: onlineStatus ?? null,
-    connected: parseOnlineState(onlineStatus),
+    connected,
+    fanConnected: firstKnownState(parseOnlineState(fanDevice?.onlineStatus), connected),
     fanStatus,
     fanOn: parseSwitchState(fanStatus),
+    lightConnected: firstKnownState(parseOnlineState(lightDevice?.onlineStatus), connected),
     lightStatus,
     lightOn: parseSwitchState(lightStatus),
+    infraredDeviceId: infraredDevice?.deviceId ?? null,
+    infraredConnected: parseOnlineState(infraredDevice?.onlineStatus),
+    infraredDetected: parseSwitchState(infraredStatus),
     statusUpdatedAt,
     rawStatus: device?.currentStatus ?? null,
   }
@@ -230,30 +257,41 @@ function normalizeTextList(value: string[] | string | null | undefined) {
 }
 
 export async function getPlantAiAnalysis(plantId: number): Promise<PlantAiAnalysis> {
-  const endpoint = plantId === 1 || plantId === 2 ? `/plant/${plantId}/analysis` : `/plants/${plantId}/analyze-risk`
-  const result = await parseResponse<any>(
-    await fetch(`${BACKEND_BASE_URL}${endpoint}`, {
-      method: "POST",
-      headers: authHeaders({ accept: "application/json" }),
-      cache: "no-store",
-    }),
-  )
-
-  if (plantId === 1 || plantId === 2) {
+  const riskResult = await fetchPlantAiAnalysis(`/plants/${plantId}/analyze-risk`)
+  if (riskResult) {
     return {
-      summary: result.summary?.trim() || "",
-      advice: normalizeTextList(result.advice),
-      riskWarnings: normalizeTextList(result.riskWarnings),
+      summary: riskResult.aiSummary?.trim() || "",
+      advice: normalizeTextList(riskResult.aiAdvice),
+      riskWarnings: normalizeTextList(riskResult.aiWarning),
+      riskLevel: riskResult.riskLevel,
+      riskScore: riskResult.riskScore,
+      riskType: Array.isArray(riskResult.riskType) ? riskResult.riskType : [],
     }
   }
 
-  return {
-    summary: result.aiSummary?.trim() || "",
-    advice: normalizeTextList(result.aiAdvice),
-    riskWarnings: normalizeTextList(result.aiWarning),
-    riskLevel: result.riskLevel,
-    riskScore: result.riskScore,
-    riskType: Array.isArray(result.riskType) ? result.riskType : [],
+  const predictionResult = await fetchPlantAiAnalysis(`/plant/${plantId}/analysis`)
+  if (predictionResult) {
+    return {
+      summary: predictionResult.summary?.trim() || "",
+      advice: normalizeTextList(predictionResult.advice),
+      riskWarnings: normalizeTextList(predictionResult.riskWarnings),
+    }
+  }
+
+  throw new Error("养护洞察接口暂时不可用")
+}
+
+async function fetchPlantAiAnalysis(endpoint: string) {
+  try {
+    return await parseResponse<any>(
+      await fetch(`${BACKEND_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: authHeaders({ accept: "application/json" }),
+        cache: "no-store",
+      }),
+    )
+  } catch {
+    return null
   }
 }
 

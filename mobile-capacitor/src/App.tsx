@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ImpactStyle } from "@capacitor/haptics"
 import { AnimatePresence, motion } from "framer-motion"
 import { CalendarDays, Home, Leaf, MessageCircle } from "lucide-react"
-import { controlHomeDevice, getHomeRealtime, getPlantAiAnalysis, getPlants } from "./api"
+import { getHomeRealtime, getPlantAiAnalysis, getPlants } from "./api"
 import { AiPage } from "./pages/AiPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { DetailPage } from "./pages/DetailPage"
@@ -50,6 +50,7 @@ export default function App() {
   const [selectedPlantId, setSelectedPlantId] = useState(() => Number(localStorage.getItem("plantcloud_selected_mobile_plant") || import.meta.env.VITE_DEFAULT_PLANT_ID || 1))
   const [realtime, setRealtime] = useState<HomeRealtimeData | null>(null)
   const [analysis, setAnalysis] = useState<PlantAiAnalysis | null>(null)
+  const [analysisLoadedPlantId, setAnalysisLoadedPlantId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +74,14 @@ export default function App() {
     setLoadingAnalysis(true)
     try {
       setAnalysis(await getPlantAiAnalysis(plant.plantId))
+      setAnalysisLoadedPlantId(plant.plantId)
+    } catch (err) {
+      setAnalysis({
+        summary: err instanceof Error ? err.message : "养护洞察接口暂时不可用",
+        advice: [],
+        riskWarnings: [],
+      })
+      setAnalysisLoadedPlantId(plant.plantId)
     } finally {
       setLoadingAnalysis(false)
     }
@@ -94,19 +103,19 @@ export default function App() {
 
   useEffect(() => {
     setAnalysis(null)
+    setAnalysisLoadedPlantId(null)
   }, [plant.plantId])
+
+  useEffect(() => {
+    if (screen === "detail" && !analysis && !loadingAnalysis && analysisLoadedPlantId !== plant.plantId) {
+      void refreshAnalysis()
+    }
+  }, [analysis, analysisLoadedPlantId, loadingAnalysis, plant.plantId, refreshAnalysis, screen])
 
   const selectPlant = (id: number) => {
     impact()
     setSelectedPlantId(id)
     localStorage.setItem("plantcloud_selected_mobile_plant", String(id))
-  }
-
-  const toggleDevice = async (target: "light" | "fan", next: boolean) => {
-    if (!realtime?.device.deviceId) return
-    impact(ImpactStyle.Medium)
-    await controlHomeDevice(plant.plantId, realtime.device.deviceId, target, next)
-    await refresh()
   }
 
   return (
@@ -137,9 +146,7 @@ export default function App() {
                 onGoAi={() => setScreen("ai")}
               />
             ) : null}
-            {screen === "detail" ? (
-              <DetailPage plant={plant} realtime={realtime} analysis={analysis} loadingAnalysis={loadingAnalysis} onAnalyze={refreshAnalysis} onToggle={toggleDevice} />
-            ) : null}
+            {screen === "detail" ? <DetailPage plant={plant} realtime={realtime} analysis={analysis} loadingAnalysis={loadingAnalysis} onAnalyze={refreshAnalysis} /> : null}
             {screen === "calendar" ? <CalendarPage plant={plant} /> : null}
             {screen === "ai" ? <AiPage plant={plant} realtime={realtime} /> : null}
             <TabBar screen={screen} onChange={setScreen} />

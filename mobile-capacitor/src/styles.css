@@ -328,7 +328,7 @@ button {
   min-height: 210px;
   margin-top: 18px;
   padding: 22px;
-  display: flex;
+  display: none;
   justify-content: space-between;
   overflow: hidden;
   border-radius: 8px;
@@ -495,6 +495,48 @@ button {
   color: var(--green-700);
 }
 
+.device-states b {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.pir-status-card {
+  align-items: flex-start;
+}
+
+.pir-status-card > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.pir-status-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 6px;
+}
+
+.pir-status-card h3 {
+  margin-top: 13px;
+  color: var(--green-950);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.pir-state {
+  color: var(--green-700);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 7px;
+}
+
+.pir-state.current {
+  opacity: 1;
+}
+
 .detail-header {
   padding: 8px 2px 0;
 }
@@ -507,6 +549,11 @@ button {
 
 .detail-header span {
   color: rgba(20, 37, 27, 0.56);
+}
+
+.detail-screen {
+  display: flex;
+  flex-direction: column;
 }
 
 .detail-orbit {
@@ -563,6 +610,13 @@ button {
 .control-card,
 .analysis-card {
   padding: 18px;
+}
+
+.detail-screen .analysis-card {
+  flex: 1;
+  min-height: calc(100vh - 178px - var(--safe-top) - var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
 }
 
 .control-card h3,
