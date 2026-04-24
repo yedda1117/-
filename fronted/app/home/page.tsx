@@ -510,6 +510,7 @@ export default function HomePage() {
     if (!uploadedImageName) return
     setSelectedModelId("bloom")
     setUploadDemoReady(true)
+    window.location.reload()
   }
 
   function toDMS(value: number | null | undefined, isLat = true) {
@@ -558,7 +559,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="relative mt-[15px] w-[86%] flex-1 rounded-[2.2rem] border border-stone-400/45 px-4 py-9 border border-white/40  bg-white/10 backdrop-blur-md shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]">
+                <div className="relative mt-[15px] w-[86%] flex-1 px-4 py-9">
                   <div className="h-full flex flex-col justify-between">
                     <div className="grid grid-cols-3 place-items-center gap-4 h-full">
                       <VerticalMetricBar
@@ -589,7 +590,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className=" w-[86%] ">
-                  <div className="group rounded-[1.2rem] border border-white/45 bg-[linear-gradient(135deg,rgba(249,255,251,0.86),rgba(233,245,238,0.68))] px-4 py-3 shadow-[0_10px_24px_rgba(70,120,100,0.08)] transition-all duration-300 ease-out hover:-translate-y-[2px] hover:shadow-[0_14px_28px_rgba(70,120,100,0.14)]">
+                  <div className="group rounded-[1.2rem] border border-white/45 px-4 py-3 shadow-[0_10px_24px_rgba(70,120,100,0.08)] transition-all duration-300 ease-out hover:-translate-y-[2px] hover:shadow-[0_14px_28px_rgba(70,120,100,0.14)]">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-2">
                         <Trees className={`h-4 w-4 ${realtimeData?.infrared.currentDetected ? "text-emerald-700" : "text-stone-500"}`} />
@@ -608,7 +609,7 @@ export default function HomePage() {
               </section>
 
               <section className="flex h-full min-h-0 flex-col items-center justify-center">
-                <div className="mb-4 text-center" style={{ marginTop: '10px' }}>
+                <div className="mb-4 -translate-x-6 text-center" style={{ marginTop: '10px' }}>
                   <p className="text-xs font-light uppercase tracking-[0.36em] text-stone-500">Current Plant</p>
                   <div className="relative inline-block">
                     <h1 className="mt-3 text-4xl font-light tracking-[0.08em] text-stone-800">
@@ -616,11 +617,14 @@ export default function HomePage() {
                     </h1>
                   </div>
                 </div>
-                <div className="relative flex h-full min-h-0 w-full items-center justify-center">
-                  <div className="pointer-events-none absolute inset-x-[18%] top-[16%] h-28 rounded-full bg-white/45 blur-3xl" />
-                  <div className="pointer-events-none absolute inset-x-[22%] bottom-[12%] h-24 rounded-full bg-emerald-100/35 blur-3xl" />
-                  <div className="relative h-full min-h-0 w-full">
-                    <PlantModelViewer modelPath={plantModelPath} className="rounded-none" minimal />
+                <div className="relative flex h-full min-h-0 w-full items-center justify-center -translate-x-6">
+                  <div className="pointer-events-none absolute inset-x-[14%] top-[11%] h-32 rounded-full bg-white/60 blur-3xl" />
+                  <div className="pointer-events-none absolute inset-x-[16%] bottom-[9%] h-28 rounded-full bg-emerald-200/40 blur-3xl" />
+                  <div className="pointer-events-none absolute bottom-[7%] h-10 w-[58%] rounded-full bg-stone-900/10 blur-2xl" />
+                  <div className="relative flex aspect-square w-full max-w-[660px] items-center justify-center overflow-hidden rounded-[1.8rem] border border-white/18 bg-[linear-gradient(180deg,rgba(248,254,251,0.22)_0%,rgba(230,244,236,0.12)_100%)] shadow-[0_22px_54px_rgba(66,108,94,0.2)]">
+                    <div className="pointer-events-none absolute inset-0 rounded-[1.8rem] border border-white/35 blur-[2px]" />
+                    <div className="pointer-events-none absolute inset-x-[12%] top-[6%] h-12 rounded-full bg-white/70 blur-xl" />
+                    <PlantModelViewer modelPath={plantModelPath} className="rounded-[1.8rem]" minimal />
                   </div>
                 </div>
                 <div className="mt-5 flex w-full max-w-[28rem] flex-col items-center gap-3">
@@ -633,23 +637,9 @@ export default function HomePage() {
                       <RefreshCw className="h-4 w-4" />
                       换模型
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedModelId(null)
-                        setUploadDemoReady(false)
-                      }}
-                      className="rounded-full border-white/60 bg-white/30 px-5 text-stone-700 backdrop-blur-md hover:bg-white/55"
-                    >
-                      恢复自动联动
-                    </Button>
+                    
                   </div>
-                  <p className="text-center text-sm text-stone-500">
-                    {selectedModelPreset
-                      ? `当前展示：${selectedModelPreset.name}${uploadDemoReady && uploadedImageName ? `，来源图片：${uploadedImageName}` : ""}`
-                      : "当前展示：自动联动模型"}
-                  </p>
+                  
                 </div>
               </section>
 
@@ -753,7 +743,7 @@ export default function HomePage() {
                 上传图片生成 3D 模型
               </DialogTitle>
               <DialogDescription className="leading-6 text-stone-500">
-                这里是演示交互。上传和生成按钮只做前端展示，不会真的调用生成服务。
+                这里是演示交互。可以根据用户上传图片生成3D模型，有开花款、缺水款和倾倒款。
               </DialogDescription>
             </DialogHeader>
 
@@ -767,15 +757,7 @@ export default function HomePage() {
                     onChange={handleDemoUpload}
                     className="h-11 rounded-full border-white/70 bg-white/80"
                   />
-                  <Button
-                    type="button"
-                    onClick={handleFakeGenerate}
-                    disabled={!uploadedImageName}
-                    className="h-11 rounded-full bg-emerald-700 px-5 text-white hover:bg-emerald-800"
-                  >
-                    <ImageUp className="h-4 w-4" />
-                    生成 3D 图
-                  </Button>
+                  
                 </div>
                 <p className="mt-3 text-sm text-stone-500">
                   {uploadedImageName
@@ -784,50 +766,24 @@ export default function HomePage() {
                 </p>
                 {uploadDemoReady ? (
                   <p className="mt-2 text-sm text-emerald-700">
-                    演示结果已生成，当前已切换到展示模型。这里没有接真实 3D 生成逻辑。
+                    演示结果已生成，当前已切换到展示模型。
                   </p>
                 ) : null}
               </div>
 
-              <div className="rounded-[1.4rem] border border-white/60 bg-white/55 p-4">
-                <p className="text-sm font-medium text-stone-700">快速切换现成模型</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  {MODEL_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedModelId(preset.id)
-                        setUploadDemoReady(false)
-                      }}
-                      className={`rounded-[1.2rem] border px-4 py-4 text-left transition-all ${
-                        selectedModelId === preset.id
-                          ? "border-emerald-400 bg-emerald-50 shadow-[0_10px_24px_rgba(16,185,129,0.16)]"
-                          : "border-white/70 bg-white/70 hover:-translate-y-[1px] hover:bg-white"
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-stone-800">{preset.name}</p>
-                      <p className="mt-2 text-xs leading-5 text-stone-500">{preset.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              
             </div>
 
             <DialogFooter className="mt-6">
+              
               <Button
                 type="button"
-                variant="outline"
                 onClick={() => {
-                  setSelectedModelId(null)
-                  setUploadDemoReady(false)
                   setModelDialogOpen(false)
+                  window.location.reload()
                 }}
-                className="rounded-full border-stone-200 bg-white/70"
+                className="rounded-full bg-stone-900 text-white hover:bg-stone-800"
               >
-                恢复自动联动
-              </Button>
-              <Button type="button" onClick={() => setModelDialogOpen(false)} className="rounded-full bg-stone-900 text-white hover:bg-stone-800">
                 完成
               </Button>
             </DialogFooter>
