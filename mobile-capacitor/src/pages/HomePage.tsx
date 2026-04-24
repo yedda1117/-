@@ -73,8 +73,12 @@ export function HomePage({
   const score = healthScore(realtime)
   const env = realtime?.environment
   const deviceOnline = realtime?.device.connected === true
-  const fanActive = realtime?.device.fanOn === true
-  const lightActive = realtime?.device.lightOn === true
+  const fanState = realtime?.device.fanOn
+  const lightState = realtime?.device.lightOn
+  const fanActive = fanState === true
+  const lightActive = lightState === true
+  const fanUnknown = fanState === null || fanState === undefined
+  const lightUnknown = lightState === null || lightState === undefined
   const infraredDetected = realtime?.infrared.currentDetected === true || realtime?.device.infraredDetected === true
   const infraredCount = realtime?.infrared.approachCount ?? 0
   const infraredStateLabel = infraredDetected ? "DETECTED" : "CLEAR"
@@ -127,7 +131,7 @@ export function HomePage({
           <h3>{deviceOnline ? "设备在线" : "等待设备同步"}</h3>
         </div>
         <div className="device-states">
-          <div className={`device-state-row ${fanActive ? "on" : ""}`}>
+          <div className={`device-state-row ${fanActive ? "on" : ""} ${fanUnknown ? "unknown" : ""}`}>
             <span>
               <Fan size={15} />
               风扇
@@ -137,18 +141,18 @@ export function HomePage({
               role="switch"
               aria-checked={fanActive}
               aria-label="切换风扇"
-              className={`device-switch ${fanActive ? "on" : ""}`}
+              className={`device-switch ${fanActive ? "on" : ""} ${fanUnknown ? "unknown" : ""}`}
               disabled={controlDisabled || controlLoadingTarget === "fan"}
               onClick={() => onToggleDevice("fan", !fanActive)}
             >
               <span className="device-switch-track">
                 <span className="device-switch-thumb">
-                  {controlLoadingTarget === "fan" ? <Loader2 size={12} className="spin" /> : null}
+                  {controlLoadingTarget === "fan" || (loading && fanUnknown) ? <Loader2 size={12} className="spin" /> : null}
                 </span>
               </span>
             </button>
           </div>
-          <div className={`device-state-row ${lightActive ? "on" : ""}`}>
+          <div className={`device-state-row ${lightActive ? "on" : ""} ${lightUnknown ? "unknown" : ""}`}>
             <span>
               <Lightbulb size={15} />
               补光
@@ -158,13 +162,13 @@ export function HomePage({
               role="switch"
               aria-checked={lightActive}
               aria-label="切换补光灯"
-              className={`device-switch ${lightActive ? "on" : ""}`}
+              className={`device-switch ${lightActive ? "on" : ""} ${lightUnknown ? "unknown" : ""}`}
               disabled={controlDisabled || controlLoadingTarget === "light"}
               onClick={() => onToggleDevice("light", !lightActive)}
             >
               <span className="device-switch-track">
                 <span className="device-switch-thumb">
-                  {controlLoadingTarget === "light" ? <Loader2 size={12} className="spin" /> : null}
+                  {controlLoadingTarget === "light" || (loading && lightUnknown) ? <Loader2 size={12} className="spin" /> : null}
                 </span>
               </span>
             </button>
