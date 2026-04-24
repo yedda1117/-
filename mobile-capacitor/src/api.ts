@@ -245,8 +245,43 @@ function normalizeTextList(value: string[] | string | null | undefined) {
   return []
 }
 
+function resolveCalendarAssetUrl(value: string | null | undefined) {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+  if (trimmed.startsWith("/")) return `${BACKEND_BASE_URL}${trimmed}`
+  return trimmed
+}
+
+function normalizeCalendarSummary(record: CalendarSummary): CalendarSummary {
+  return {
+    ...record,
+    thumbnailUrl: resolveCalendarAssetUrl(record.thumbnailUrl),
+  }
+}
+
+function normalizeCalendarDayDetail(detail: CalendarDayDetail): CalendarDayDetail {
+  return {
+    ...detail,
+    photoUrl: resolveCalendarAssetUrl(detail.photoUrl),
+    originPhotoUrl: resolveCalendarAssetUrl(detail.originPhotoUrl),
+  }
+}
+
+function normalizePhotoUploadResult(result: PhotoUploadResult): PhotoUploadResult {
+  return {
+    ...result,
+    photoUrl: resolveCalendarAssetUrl(result.photoUrl),
+    originPhotoUrl: resolveCalendarAssetUrl(result.originPhotoUrl),
+    thumbnailUrl: resolveCalendarAssetUrl(result.thumbnailUrl),
+  }
+}
+
+const PREDICTION_PLANT_IDS = [1, 2, 6]
+
 export async function getPlantAiAnalysis(plantId: number): Promise<PlantAiAnalysis> {
-  const endpoint = plantId === 1 || plantId === 2 ? `/plant/${plantId}/analysis` : `/plants/${plantId}/analyze-risk`
+  const endpoint = PREDICTION_PLANT_IDS.includes(plantId) ? `/plant/${plantId}/analysis` : `/plants/${plantId}/analyze-risk`
   const result = await parseResponse<any>(
     await fetch(`${BACKEND_BASE_URL}${endpoint}`, {
       method: "POST",
@@ -255,7 +290,7 @@ export async function getPlantAiAnalysis(plantId: number): Promise<PlantAiAnalys
     }),
   )
 
-  if (plantId === 1 || plantId === 2) {
+  if (PREDICTION_PLANT_IDS.includes(plantId)) {
     return {
       summary: result.summary?.trim() || "",
       advice: normalizeTextList(result.advice),
@@ -350,27 +385,29 @@ export async function createStrategyFromProposal(payload: Record<string, unknown
 }
 
 export async function getCalendarSummary(plantId: number, year: number, month: number) {
-  return parseResponse<CalendarSummary[]>(
+  const result = await parseResponse<CalendarSummary[]>(
     await fetch(`${BACKEND_BASE_URL}/calendar?plant_id=${plantId}&year=${year}&month=${month}`, {
       headers: authHeaders({ accept: "application/json" }),
       cache: "no-store",
     }),
   )
+  return result.map(normalizeCalendarSummary)
 }
 
 export async function getCalendarDayDetail(plantId: number, date: string) {
-  return parseResponse<CalendarDayDetail>(
+  const result = await parseResponse<CalendarDayDetail>(
     await fetch(`${BACKEND_BASE_URL}/calendar/${date}?plant_id=${plantId}`, {
       headers: authHeaders({ accept: "application/json" }),
       cache: "no-store",
     }),
   )
+  return normalizeCalendarDayDetail(result)
 }
 
 export async function updateCalendarDayLog(plantId: number, date: string, payload: { note?: string; milestone?: string | null }) {
   const url = `${BACKEND_BASE_URL}/calendar/${date}?plant_id=${plantId}`
   logApiRequest("updateCalendarDayLog", url, BACKEND_BASE_URL)
-  return parseResponse<CalendarDayDetail>(
+  const result = await parseResponse<CalendarDayDetail>(
     await fetch(url, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json", accept: "application/json" }),
@@ -378,12 +415,13 @@ export async function updateCalendarDayLog(plantId: number, date: string, payloa
       body: JSON.stringify(payload),
     }),
   )
+  return normalizeCalendarDayDetail(result)
 }
 
 export async function uploadPlantPhoto(formData: FormData) {
   const url = `${BACKEND_BASE_URL}/photos/upload`
   logApiRequest("uploadPlantPhoto", url, BACKEND_BASE_URL)
-  return parseResponse<PhotoUploadResult>(
+  const result = await parseResponse<PhotoUploadResult>(
     await fetch(url, {
       method: "POST",
       headers: authHeaders(),
@@ -391,4 +429,5 @@ export async function uploadPlantPhoto(formData: FormData) {
       body: formData,
     }),
   )
+  return normalizePhotoUploadResult(result)
 }

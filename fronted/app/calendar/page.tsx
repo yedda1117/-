@@ -313,7 +313,7 @@ export default function CalendarPage() {
       Object.entries(calendarData)
         .map(([day, value]) => ({ day: Number(day), value }))
         .filter(({ value }) => value.hasPhoto && Boolean(value.photoUrl))
-        .sort((a, b) => a.day - b.day),
+        .sort((a, b) => b.day - a.day),
     [calendarData],
   )
 
@@ -483,7 +483,8 @@ export default function CalendarPage() {
             milestone: milestoneFromApi(detail?.milestone ?? value.milestone) ?? value.milestone,
           }
         })
-        .filter((item): item is NoteBoardItem => item !== null),
+        .filter((item): item is NoteBoardItem => item !== null)
+        .sort((a, b) => b.date.localeCompare(a.date)),
     [photoDays, boardDetails, year, month],
   )
 
@@ -545,8 +546,12 @@ export default function CalendarPage() {
                           ) : null}
                         </div>
 
-                        <div className="mb-3 overflow-hidden border border-black/5 bg-white/50 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
-                          <img src={item.photoUrl} alt={`${month + 1}月${item.day}日植物记录`} className="h-48 w-full object-cover" />
+                        <div className="mb-3 aspect-square overflow-hidden border border-black/5 bg-white/70 p-3 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
+                          <img
+                            src={item.photoUrl}
+                            alt={`${month + 1}月${item.day}日植物记录`}
+                            className="h-full w-full object-contain"
+                          />
                         </div>
 
                         <p className="line-clamp-2 text-sm leading-5 text-zinc-700">
