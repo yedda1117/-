@@ -198,11 +198,11 @@ function buildHomeDeviceStatus(overview: DeviceStatusOverview): HomeDeviceStatus
   const infraredDeviceStatus = parseStatusJson(infraredDevice?.currentStatus)
   const mqttStatus = getStringField(status, "mqttStatus", "onlineStatus", "status")
   const fanStatus =
-    getStringField(status, "fanStatus", "fan_status", "fan") ||
-    getStringField(fanDeviceStatus, "power", "status", "switch", "value", "fanStatus", "fan_status", "fan")
+    getStringField(fanDeviceStatus, "power", "status", "switch", "value", "fanStatus", "fan_status", "fan") ||
+    getStringField(status, "fanStatus", "fan_status", "fan")
   const lightStatus =
-    getStringField(status, "lightStatus", "light_status", "light") ||
-    getStringField(lightDeviceStatus, "power", "status", "switch", "value", "lightStatus", "light_status", "light")
+    getStringField(lightDeviceStatus, "power", "status", "switch", "value", "lightStatus", "light_status", "light") ||
+    getStringField(status, "lightStatus", "light_status", "light")
   const infraredStatus = getStringField(infraredDeviceStatus, "detected", "pirStatus", "status", "value")
   const statusUpdatedAt = getStringField(status, "statusUpdatedAt", "commandUpdatedAt", "telemetryUpdatedAt")
   const onlineStatus = device?.onlineStatus || mqttStatus

@@ -1074,6 +1074,10 @@ button {
   color: var(--green-700);
 }
 
+.device-state-row.unknown span {
+  color: rgba(20, 37, 27, 0.62);
+}
+
 .device-switch {
   padding: 0;
   background: transparent;
@@ -1095,6 +1099,10 @@ button {
   background: #bfe8c8;
 }
 
+.device-switch.unknown .device-switch-track {
+  background: rgba(20, 37, 27, 0.08);
+}
+
 .device-switch-thumb {
   width: 24px;
   height: 24px;
@@ -1111,6 +1119,11 @@ button {
 
 .device-switch.on .device-switch-thumb {
   transform: translateX(22px);
+}
+
+.device-switch.unknown .device-switch-thumb {
+  transform: translateX(11px);
+  color: rgba(20, 37, 27, 0.52);
 }
 
 .device-switch:disabled {
