@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ImpactStyle } from "@capacitor/haptics"
 import { AnimatePresence, motion } from "framer-motion"
 import { CalendarDays, Home, Leaf, MessageCircle } from "lucide-react"
-import { getHomeRealtime, getPlantAiAnalysis, getPlants, hasAuthSession } from "./api"
+import { controlHomeDevice, getHomeRealtime, getPlantAiAnalysis, getPlants, hasAuthSession } from "./api"
 import { AiPage } from "./pages/AiPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { DetailPage } from "./pages/DetailPage"
@@ -15,6 +15,9 @@ import { fallbackPlants, impact } from "./mobile-utils"
 
 type MainScreen = "home" | "detail" | "calendar" | "ai"
 type Screen = "login" | "register" | "intro" | MainScreen
+
+const DEVICE_OVERRIDE_STORAGE_KEY = "plantcloud_mobile_device_overrides"
+const REALTIME_CACHE_STORAGE_KEY = "plantcloud_mobile_realtime_cache"
 
 function initialScreen(): Screen {
   if (!hasAuthSession()) return "login"
@@ -62,6 +65,7 @@ export default function App() {
   const [analysisLoadedPlantId, setAnalysisLoadedPlantId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+  const [controlLoadingTarget, setControlLoadingTarget] = useState<"light" | "fan" | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const plant = useMemo(() => plants.find((item) => item.plantId === selectedPlantId) || plants[0] || fallbackPlants[0], [plants, selectedPlantId])
@@ -108,6 +112,11 @@ export default function App() {
   }, [authenticated])
 
   useEffect(() => {
+    localStorage.removeItem(DEVICE_OVERRIDE_STORAGE_KEY)
+    localStorage.removeItem(REALTIME_CACHE_STORAGE_KEY)
+  }, [])
+
+  useEffect(() => {
     if (!authenticated) return undefined
     void refresh()
     const timer = window.setInterval(() => void refresh(), 8000)
@@ -125,6 +134,11 @@ export default function App() {
     }
   }, [analysis, analysisLoadedPlantId, loadingAnalysis, plant.plantId, refreshAnalysis, screen])
 
+  const handleLoggedIn = useCallback((_session: LoginResult) => {
+    setAuthenticated(true)
+    setScreen(localStorage.getItem("plantcloud_mobile_seen_intro") ? "home" : "intro")
+  }, [])
+
   const selectPlant = (id: number) => {
     impact()
     setSelectedPlantId(id)
@@ -134,8 +148,29 @@ export default function App() {
   const toggleDevice = async (target: "light" | "fan", next: boolean) => {
     if (!realtime?.device.deviceId) return
     impact(ImpactStyle.Medium)
-    await controlHomeDevice(plant.plantId, realtime.device.deviceId, target, next)
-    await refresh()
+    setControlLoadingTarget(target)
+    try {
+      await controlHomeDevice(plant.plantId, realtime.device.deviceId, target, next)
+      setRealtime((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          device: {
+            ...current.device,
+            fanOn: target === "fan" ? next : current.device.fanOn,
+            fanStatus: target === "fan" ? (next ? "ON" : "OFF") : current.device.fanStatus,
+            lightOn: target === "light" ? next : current.device.lightOn,
+            lightStatus: target === "light" ? (next ? "ON" : "OFF") : current.device.lightStatus,
+          },
+        }
+      })
+      await refresh()
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "设备控制失败")
+    } finally {
+      setControlLoadingTarget(null)
+    }
   }
 
   return (
@@ -167,11 +202,10 @@ export default function App() {
                 selectedPlantId={selectedPlantId}
                 realtime={realtime}
                 loading={loading}
-                error={error}
                 onSelectPlant={selectPlant}
                 onRefresh={refresh}
-                onGoDetail={() => setScreen("detail")}
-                onGoAi={() => setScreen("ai")}
+                onToggleDevice={toggleDevice}
+                controlLoadingTarget={controlLoadingTarget}
               />
             ) : null}
             {screen === "detail" ? <DetailPage plant={plant} realtime={realtime} analysis={analysis} loadingAnalysis={loadingAnalysis} onAnalyze={refreshAnalysis} /> : null}

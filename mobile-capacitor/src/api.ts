@@ -54,6 +54,7 @@ type DeviceStatusOverview = {
   devices: DeviceStatusItem[]
 }
 
+
 function stringifyLongIdFields(responseText: string) {
   return LONG_ID_FIELDS.reduce((text, field) => {
     const pattern = new RegExp(`("${field}"\\s*:\\s*)(-?\\d{16,})`, "g")
@@ -341,7 +342,7 @@ export async function controlHomeDevice(plantId: number, deviceId: number | stri
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json", accept: "application/json" }),
       cache: "no-store",
-      body: JSON.stringify({ plantId, deviceId, commandValue: turnOn ? "ON" : "OFF" }),
+      body: JSON.stringify({ plantId, deviceId, commandValue: turnOn ? "ON" : "OFF", sourceType: "MANUAL" }),
     }),
   )
 }
