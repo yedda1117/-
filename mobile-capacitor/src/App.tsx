@@ -202,11 +202,8 @@ export default function App() {
                 selectedPlantId={selectedPlantId}
                 realtime={realtime}
                 loading={loading}
-                error={error}
                 onSelectPlant={selectPlant}
                 onRefresh={refresh}
-                onGoDetail={() => setScreen("detail")}
-                onGoAi={() => setScreen("ai")}
                 onToggleDevice={toggleDevice}
                 controlLoadingTarget={controlLoadingTarget}
               />
