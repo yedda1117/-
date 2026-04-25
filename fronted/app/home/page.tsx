@@ -61,7 +61,7 @@ const MODEL_PRESETS = [
     id: "bloom",
     name: "开花款",
     description: "使用当前默认开花模型进行展示。",
-    modelPath: "/models/hudielan-normal.glb",
+    modelPath: "/models/zhizihua.glb",
   },
   {
     id: "dry",
@@ -478,7 +478,7 @@ export default function HomePage() {
     const temperatureStatus = (realtimeData?.environment.temperatureStatus || "").toUpperCase()
     const hasEnvironmentStress = humidityStatus === "LOW" || lightStatus === "HIGH" || temperatureStatus === "HIGH"
 
-    return hasEnvironmentStress ? "/models/kuwei.glb" : "/models/hudielan-normal.glb"
+    return hasEnvironmentStress ? "/models/kuwei.glb" : "/models/zhizihua.glb"
   }, [activityLogs, realtimeData?.environment.humidityStatus, realtimeData?.environment.lightStatus, realtimeData?.environment.temperatureStatus])
   const selectedModelPreset = useMemo(
     () => MODEL_PRESETS.find((preset) => preset.id === selectedModelId) ?? null,
